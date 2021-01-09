@@ -26,7 +26,7 @@ def get_secret():
 
 def verify_request():
 	"""Verify if the incoming signed request if it is correct."""
-	query_string = frappe.safe_decode(frappe.local.flags.signed_query_string or \
+	query_string = frappe.safe_decode(frappe.local.flags.query_string_to_verify or \
 		getattr(frappe.request, 'query_string', None))
 
 	valid = False

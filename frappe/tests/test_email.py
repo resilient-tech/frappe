@@ -121,7 +121,7 @@ class TestEmail(unittest.TestCase):
 				else:
 					eol = "\n"
 
-				frappe.local.flags.signed_query_string = \
+				frappe.local.flags.query_string_to_verify = \
 					re.search(r'(?<=/api/method/frappe.email.queue.unsubscribe\?).*(?=' + eol + ')',
 								content.decode()).group(0)
 				self.assertTrue(verify_request())
