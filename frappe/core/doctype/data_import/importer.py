@@ -121,6 +121,10 @@ class Importer:
 						)
 					continue
 
+				# Working on a case to deal with overwrite
+				# if not autoname and frappe.db.exists(payload.doctype, payload.docname):
+					# continue
+
 				try:
 					start = timeit.default_timer()
 					doc = self.process_doc(doc)
@@ -201,7 +205,7 @@ class Importer:
 		new_doc.update(doc)
 
 		if (meta.autoname or "").lower() != "prompt":
-			# name can only be set directly if autoname is prompt
+			# name can only be set directly if autoname is not prompt
 			new_doc.set("name", None)
 
 		new_doc.flags.updater_reference = {
@@ -210,7 +214,11 @@ class Importer:
 			"label": _("via Data Import"),
 		}
 
-		new_doc.insert()
+		if not data_import.autoname:
+			new_doc.insert(set_name=doc.name)
+		else:
+			new_doc.insert()
+
 		if meta.is_submittable and self.data_import.submit_after_import:
 			new_doc.submit()
 		return new_doc

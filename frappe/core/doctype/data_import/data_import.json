@@ -18,6 +18,7 @@
   "status",
   "submit_after_import",
   "mute_emails",
+  "autoname",
   "template_options",
   "import_warnings_section",
   "template_warnings",
@@ -163,11 +164,17 @@
    "fieldname": "refresh_google_sheet",
    "fieldtype": "Button",
    "label": "Refresh Google Sheet"
+  },
+  {
+   "default": "1",
+   "fieldname": "autoname",
+   "fieldtype": "Check",
+   "label": "Set Name According To Naming Series"
   }
  ],
  "hide_toolbar": 1,
  "links": [],
- "modified": "2020-06-24 14:33:03.173876",
+ "modified": "2021-01-15 06:00:27.175938",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "Data Import",
