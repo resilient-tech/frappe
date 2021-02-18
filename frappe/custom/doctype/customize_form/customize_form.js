@@ -46,9 +46,9 @@ frappe.ui.form.on("Customize Form", {
 			};
 		});
 
-		$(frm.wrapper).on("grid-row-render", function(e, grid_row) {
-			if (grid_row.doc && grid_row.doc.fieldtype == "Section Break") {
-				$(grid_row.row).css({ "font-weight": "bold" });
+		frm.set_row_formatter("fields", function(doc) {
+			if (doc.fieldtype === "Section Break") {
+				return "bold";
 			}
 		});
 

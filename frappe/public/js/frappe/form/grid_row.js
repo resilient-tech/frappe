@@ -209,6 +209,7 @@ export default class GridRow {
 		this.refresh_check();
 
 		if(this.frm && this.doc) {
+			this.apply_formatter();
 			$(this.frm.wrapper).trigger("grid-row-render", [this]);
 		}
 	}
@@ -219,6 +220,22 @@ export default class GridRow {
 
 	is_too_small() {
 		return this.row.width() ? this.row.width() < 300 : false;
+	}
+
+	apply_formatter() {
+		console.log(`formatter applied to row # ${this.doc.idx}`);
+		const formatter = this.grid.row_formatter;
+		if (!formatter) return;
+
+		const format_data = formatter(this.doc, this);
+		if (!format_data) return;
+
+		if ($.isPlainObject(format_data)) {
+			this.row.css(format_data);
+			return;
+		}
+
+		this.row.addClass(format_data);
 	}
 
 	add_open_form_button() {

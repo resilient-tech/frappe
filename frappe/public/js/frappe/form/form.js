@@ -1468,6 +1468,15 @@ frappe.ui.form.Form = class FrappeForm {
 		return selected;
 	}
 
+	set_row_formatter(fieldname, formatter) {
+		const grid = this.fields_dict[fieldname] && this.fields_dict[fieldname].grid;
+		if (!grid) {
+			throw(__("Fieldname {0} not found or isn't a grid.", [fieldname]));
+		}
+
+		grid.row_formatter = formatter;
+	}
+
 	set_indicator_formatter(fieldname, get_color, get_text) {
 		// get doctype from parent
 		var doctype;
