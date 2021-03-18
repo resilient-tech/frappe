@@ -7,7 +7,7 @@ $.extend(frappe.model, {
 	new_names: {},
 	new_name_count: {},
 
-	get_new_doc: function(
+	get_new_doc: function (
 		doctype,
 		parent_doc,
 		parentfield,
@@ -20,7 +20,7 @@ $.extend(frappe.model, {
 			name: frappe.model.get_new_name(doctype),
 			__islocal: 1,
 			__unsaved: 1,
-			owner: frappe.session.user
+			owner: frappe.session.user,
 		};
 		frappe.model.set_default_values(doc, parent_doc);
 
@@ -28,7 +28,7 @@ $.extend(frappe.model, {
 			$.extend(doc, {
 				parent: parent_doc.name,
 				parentfield: parentfield,
-				parenttype: parent_doc.doctype
+				parenttype: parent_doc.doctype,
 			});
 			if (!parent_doc[parentfield]) parent_doc[parentfield] = [];
 			doc.idx = parent_doc[parentfield].length + 1;
@@ -62,7 +62,7 @@ $.extend(frappe.model, {
 
 		// set route options
 		if (frappe.route_options && !doc.parent) {
-			$.each(frappe.route_options, function(fieldname, value) {
+			$.each(frappe.route_options, function (fieldname, value) {
 				var df = frappe.meta.has_field(doctype, fieldname);
 				if (
 					df &&
@@ -81,7 +81,7 @@ $.extend(frappe.model, {
 		return doc;
 	},
 
-	make_new_doc_and_get_name: function(doctype, with_mandatory_children) {
+	make_new_doc_and_get_name: function (doctype, with_mandatory_children) {
 		return frappe.model.get_new_doc(
 			doctype,
 			null,
@@ -90,14 +90,14 @@ $.extend(frappe.model, {
 		).name;
 	},
 
-	get_new_name: function(doctype) {
+	get_new_name: function (doctype) {
 		var cnt = frappe.model.new_name_count;
 		if (!cnt[doctype]) cnt[doctype] = 0;
 		cnt[doctype]++;
 		return frappe.router.slug(`new-${doctype}-${cnt[doctype]}`);
 	},
 
-	set_default_values: function(doc, parent_doc) {
+	set_default_values: function (doc, parent_doc) {
 		var doctype = doc.doctype;
 		var docfields = frappe.meta.get_docfields(doctype);
 		var updated = [];
@@ -129,19 +129,19 @@ $.extend(frappe.model, {
 		return updated;
 	},
 
-	create_mandatory_children: function(doc) {
+	create_mandatory_children: function (doc) {
 		var meta = frappe.get_meta(doc.doctype);
 		if (meta && meta.istable) return;
 
 		// create empty rows for mandatory table fields
-		frappe.meta.get_docfields(doc.doctype).forEach(function(df) {
+		frappe.meta.get_docfields(doc.doctype).forEach(function (df) {
 			if (df.fieldtype === "Table" && df.reqd) {
 				frappe.model.add_child(doc, df.fieldname);
 			}
 		});
 	},
 
-	get_default_value: function(df, doc, parent_doc) {
+	get_default_value: function (df, doc, parent_doc) {
 		var user_default = "";
 		var user_permissions = frappe.defaults.get_user_permissions();
 		let allowed_records = [];
@@ -150,7 +150,7 @@ $.extend(frappe.model, {
 		if (user_permissions) {
 			({
 				allowed_records,
-				default_doc
+				default_doc,
 			} = frappe.perm.filter_allowed_docs_for_doctype(
 				user_permissions[df.options],
 				doc.doctype
@@ -172,19 +172,24 @@ $.extend(frappe.model, {
 				// 2 - look in user defaults
 
 				if (!df.ignore_user_permissions) {
-					var user_defaults = frappe.defaults.get_user_defaults(df.options);
-					if (user_defaults && user_defaults.length===1) {
+					var user_defaults = frappe.defaults.get_user_defaults(
+						df.options
+					);
+					if (user_defaults && user_defaults.length === 1) {
 						// Use User Permission value when only when it has a single value
 						user_default = user_defaults[0];
 					}
 				} else if (!user_default) {
-					user_default = frappe.defaults.get_user_default(df.fieldname);
+					user_default = frappe.defaults.get_user_default(
+						df.fieldname
+					);
 				} else if (
 					!user_default &&
 					df.remember_last_selected_value &&
 					frappe.boot.user.last_selected_values
 				) {
-					user_default = frappe.boot.user.last_selected_values[df.options];
+					user_default =
+						frappe.boot.user.last_selected_values[df.options];
 				}
 
 				var is_allowed_user_default =
@@ -251,7 +256,7 @@ $.extend(frappe.model, {
 		return value;
 	},
 
-	get_default_from_boot_docs: function(df, doc, parent_doc) {
+	get_default_from_boot_docs: function (df, doc, parent_doc) {
 		// set default from partial docs passed during boot like ":User"
 		if (frappe.get_list(df["default"]).length > 0) {
 			var ref_fieldname = df["default"]
@@ -271,7 +276,7 @@ $.extend(frappe.model, {
 		}
 	},
 
-	add_child: function(parent_doc, doctype, parentfield, idx) {
+	add_child: function (parent_doc, doctype, parentfield, idx) {
 		// if given doc, fieldname only
 		if (arguments.length === 2) {
 			parentfield = doctype;
@@ -287,7 +292,7 @@ $.extend(frappe.model, {
 
 		// renum for fraction
 		if (idx !== cint(idx)) {
-			var sorted = parent_doc[parentfield].sort(function(a, b) {
+			var sorted = parent_doc[parentfield].sort(function (a, b) {
 				return a.idx - b.idx;
 			});
 			for (var i = 0, j = sorted.length; i < j; i++) {
@@ -301,12 +306,12 @@ $.extend(frappe.model, {
 		return child;
 	},
 
-	copy_doc: function(doc, from_amend, parent_doc, parentfield) {
+	copy_doc: function (doc, from_amend, parent_doc, parentfield) {
 		var no_copy_list = [
 			"name",
 			"amended_from",
 			"amendment_date",
-			"cancel_reason"
+			"cancel_reason",
 		];
 		var newdoc = frappe.model.get_new_doc(
 			doc.doctype,
@@ -322,7 +327,7 @@ $.extend(frappe.model, {
 				df &&
 				key.substr(0, 2) != "__" &&
 				!in_list(no_copy_list, key) &&
-				!(df && (!from_amend && cint(df.no_copy) == 1))
+				!(df && !from_amend && cint(df.no_copy) == 1)
 			) {
 				var value = doc[key] || [];
 				if (frappe.model.table_fields.includes(df.fieldtype)) {
@@ -353,7 +358,7 @@ $.extend(frappe.model, {
 		return newdoc;
 	},
 
-	open_mapped_doc: function(opts) {
+	open_mapped_doc: function (opts) {
 		if (opts.frm && opts.frm.doc.__unsaved) {
 			frappe.throw(
 				__(
@@ -373,11 +378,11 @@ $.extend(frappe.model, {
 				method: opts.method,
 				source_name: opts.source_name,
 				args: opts.args || null,
-				selected_children: opts.frm ? opts.frm.get_selected() : null
+				selected_children: opts.frm ? opts.frm.get_selected() : null,
 			},
 			freeze: true,
 			freeze_message: opts.freeze_message || "",
-			callback: function(r) {
+			callback: function (r) {
 				if (!r.exc) {
 					frappe.model.sync(r.message);
 					if (opts.run_link_triggers) {
@@ -388,24 +393,24 @@ $.extend(frappe.model, {
 					}
 					frappe.set_route("Form", r.message.doctype, r.message.name);
 				}
-			}
+			},
 		});
-	}
+	},
 });
 
 frappe.create_routes = {};
-frappe.new_doc = function(doctype, opts, init_callback) {
+frappe.new_doc = function (doctype, opts, init_callback) {
 	if (doctype === "File") {
 		new frappe.ui.FileUploader({
-			folder: opts ? opts.folder : "Home"
+			folder: opts ? opts.folder : "Home",
 		});
 		return;
 	}
-	return new Promise(resolve => {
+	return new Promise((resolve) => {
 		if (opts && $.isPlainObject(opts)) {
 			frappe.route_options = opts;
 		}
-		frappe.model.with_doctype(doctype, function() {
+		frappe.model.with_doctype(doctype, function () {
 			if (frappe.create_routes[doctype]) {
 				frappe
 					.set_route(frappe.create_routes[doctype])

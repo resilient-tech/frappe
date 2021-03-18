@@ -1,0 +1,10 @@
+*.html
+*.md
+*.json
+*.yml
+*.yaml
+frappe/templates/
+frappe/www/
+**/boilerplate/*
+frappe/website/doctype/website_theme/*.*css
+frappe/public/js/lib/*

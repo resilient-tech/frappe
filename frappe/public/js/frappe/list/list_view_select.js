@@ -44,7 +44,7 @@ frappe.views.ListViewSelect = class ListViewSelect {
 		const views = {
 			List: {
 				condition: true,
-				action: () => this.set_route("list")
+				action: () => this.set_route("list"),
 			},
 			Report: {
 				condition: true,
@@ -56,28 +56,32 @@ frappe.views.ListViewSelect = class ListViewSelect {
 					if (frappe.get_route().length > 3) {
 						default_action = {
 							label: __("Report Builder"),
-							action: () => this.set_route("report")
+							action: () => this.set_route("report"),
 						};
 					}
-					this.setup_dropdown_in_sidebar("Report", reports, default_action);
-				}
+					this.setup_dropdown_in_sidebar(
+						"Report",
+						reports,
+						default_action
+					);
+				},
 			},
 			Dashboard: {
 				condition: true,
-				action: () => this.set_route("dashboard")
+				action: () => this.set_route("dashboard"),
 			},
 			Calendar: {
 				condition: frappe.views.calendar[this.doctype],
 				action: () => this.set_route("calendar", "default"),
 				current_view_handler: () => {
-					this.get_calendars().then(calendars => {
+					this.get_calendars().then((calendars) => {
 						this.setup_dropdown_in_sidebar("Calendar", calendars);
 					});
-				}
+				},
 			},
 			Gantt: {
 				condition: frappe.views.calendar[this.doctype],
-				action: () => this.set_route("gantt")
+				action: () => this.set_route("gantt"),
 			},
 			Inbox: {
 				condition:
@@ -90,12 +94,12 @@ frappe.views.ListViewSelect = class ListViewSelect {
 					if (
 						has_common(frappe.user_roles, [
 							"System Manager",
-							"Administrator"
+							"Administrator",
 						])
 					) {
 						default_action = {
 							label: __("New Email Account"),
-							action: () => frappe.new_doc("Email Account")
+							action: () => frappe.new_doc("Email Account"),
 						};
 					}
 					this.setup_dropdown_in_sidebar(
@@ -103,30 +107,30 @@ frappe.views.ListViewSelect = class ListViewSelect {
 						accounts,
 						default_action
 					);
-				}
+				},
 			},
 			Image: {
 				condition: this.list_view.meta.image_field,
-				action: () => this.set_route("image")
+				action: () => this.set_route("image"),
 			},
 			Tree: {
 				condition:
 					frappe.treeview_settings[this.doctype] ||
 					frappe.get_meta(this.doctype).is_tree,
-				action: () => this.set_route("tree")
+				action: () => this.set_route("tree"),
 			},
 			Kanban: {
 				condition: true,
 				action: () => this.setup_kanban_boards(),
 				current_view_handler: () => {
-					frappe.views.KanbanView.get_kanbans(this.doctype).then(
-						kanbans => this.setup_kanban_switcher(kanbans)
-					);
-				}
-			}
+					frappe.views.KanbanView.get_kanbans(
+						this.doctype
+					).then((kanbans) => this.setup_kanban_switcher(kanbans));
+				},
+			},
 		};
 
-		frappe.views.view_modes.forEach(view => {
+		frappe.views.view_modes.forEach((view) => {
 			if (this.current_view !== view && views[view].condition) {
 				this.add_view_to_menu(view, views[view].action);
 			}
@@ -153,13 +157,11 @@ frappe.views.ListViewSelect = class ListViewSelect {
 				</div>`;
 		} else {
 			const page_name = this.get_page_name();
-			items.map(item => {
+			items.map((item) => {
 				if (item.name.toLowerCase() == page_name.toLowerCase()) {
 					placeholder = item.name;
 				} else {
-					html += `<li><a class="dropdown-item" href="${item.route}">${
-						item.name
-					}</a></li>`;
+					html += `<li><a class="dropdown-item" href="${item.route}">${item.name}</a></li>`;
 				}
 			});
 		}
@@ -185,7 +187,7 @@ frappe.views.ListViewSelect = class ListViewSelect {
 			this.list_view.$filter_section
 		);
 
-		kanbans.map(k => {
+		kanbans.map((k) => {
 			this.page.add_custom_menu_item(
 				kanban_switcher,
 				k.name,
@@ -213,8 +215,8 @@ frappe.views.ListViewSelect = class ListViewSelect {
 		let added = [];
 		let reports_to_add = [];
 
-		let add_reports = reports => {
-			reports.map(r => {
+		let add_reports = (reports) => {
+			reports.map((r) => {
 				if (!r.ref_doctype || r.ref_doctype == this.doctype) {
 					const report_type =
 						r.report_type === "Report Builder"
@@ -229,7 +231,7 @@ frappe.views.ListViewSelect = class ListViewSelect {
 						added.push(route);
 						reports_to_add.push({
 							name: r.title || r.name,
-							route: route
+							route: route,
 						});
 					}
 				}
@@ -277,25 +279,25 @@ frappe.views.ListViewSelect = class ListViewSelect {
 		return frappe.db
 			.get_list("Calendar View", {
 				filters: {
-					reference_doctype: doctype
-				}
+					reference_doctype: doctype,
+				},
 			})
-			.then(result => {
+			.then((result) => {
 				if (!(result && Array.isArray(result) && result.length)) return;
 
 				if (frappe.views.calendar[this.doctype]) {
 					// has standard calendar view
 					calendars.push({
 						name: "Default",
-						route: `/app/${this.slug()}/view/calendar/default`
+						route: `/app/${this.slug()}/view/calendar/default`,
 					});
 				}
-				result.map(calendar => {
+				result.map((calendar) => {
 					calendars.push({
 						name: calendar.name,
 						route: `/app/${this.slug()}/view/calendar/${
 							calendar.name
-						}`
+						}`,
 					});
 				});
 
@@ -306,7 +308,7 @@ frappe.views.ListViewSelect = class ListViewSelect {
 	get_email_accounts() {
 		let accounts_to_add = [];
 		let accounts = frappe.boot.email_accounts;
-		accounts.forEach(account => {
+		accounts.forEach((account) => {
 			let email_account =
 				account.email_id == "All Accounts"
 					? "All Accounts"
@@ -316,14 +318,14 @@ frappe.views.ListViewSelect = class ListViewSelect {
 				"All Accounts",
 				"Sent Mail",
 				"Spam",
-				"Trash"
+				"Trash",
 			].includes(account.email_id)
 				? __(account.email_id)
 				: account.email_account;
 
 			accounts_to_add.push({
 				name: display_name,
-				route: route
+				route: route,
 			});
 		});
 

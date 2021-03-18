@@ -1,6 +1,8 @@
 /* the element that this class is applied to, should have a max width for this to work*/
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
 }
 a {
   cursor: pointer;
@@ -22,10 +24,10 @@ p {
   margin: 10px 0px;
 }
 .text-color {
-  color: #36414C !important;
+  color: #36414c !important;
 }
 .text-muted {
-  color: #8D99A6 !important;
+  color: #8d99a6 !important;
 }
 .text-extra-muted {
   color: #d1d8dd !important;
@@ -79,7 +81,7 @@ a.text-extra-muted {
 }
 kbd {
   color: inherit;
-  background-color: #F0F4F7;
+  background-color: #f0f4f7;
 }
 .btn [class^="fa fa-"],
 .nav [class^="fa fa-"],
@@ -111,7 +113,7 @@ kbd {
 a.badge-hover:hover .badge,
 a.badge-hover:focus .badge,
 a.badge-hover:active .badge {
-  background-color: #D8DFE5;
+  background-color: #d8dfe5;
 }
 .msgprint {
   word-wrap: break-word;
@@ -192,7 +194,7 @@ a.badge-hover:active .badge {
   transform: translate(-50%, -50%);
   -webkit-transform: translate(-50%, -50%);
   text-align: center;
-  color: #36414C !important;
+  color: #36414c !important;
 }
 #freeze.dark {
   background-color: #334143;
@@ -242,7 +244,7 @@ a.no-decoration:active {
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.4px;
-  color: #8D99A6;
+  color: #8d99a6;
 }
 .ellipsis {
   white-space: nowrap;
@@ -261,7 +263,7 @@ a.form-link {
   font-size: 102%;
 }
 a[disabled="disabled"] {
-  color: #8D99A6;
+  color: #8d99a6;
   text-decoration: none;
   cursor: default;
 }
@@ -278,11 +280,11 @@ a[disabled="disabled"]:hover {
   z-index: 3;
 }
 .link-primary {
-  color: #5E64FF;
+  color: #5e64ff;
 }
 .link-primary:hover,
 .link-primary:focus {
-  color: #5E64FF;
+  color: #5e64ff;
 }
 .scroll-to-top {
   background-color: #fafbfc;
@@ -361,7 +363,7 @@ fieldset[disabled] .form-control {
 }
 .link-select-row {
   padding: 5px;
-  border-bottom: 1px solid #EBEFF2;
+  border-bottom: 1px solid #ebeff2;
 }
 .datepicker {
   font-family: inherit;
@@ -373,13 +375,13 @@ fieldset[disabled] .form-control {
   font-family: inherit;
 }
 .datepicker--day-name {
-  color: #36414C;
+  color: #36414c;
 }
 .datepicker--cell.-current- {
-  color: #5E64FF;
+  color: #5e64ff;
 }
 .datepicker--cell.-current-.-in-range- {
-  color: #5E64FF;
+  color: #5e64ff;
 }
 .datepicker--cell.-range-from-,
 .datepicker--cell.-range-to- {
@@ -388,7 +390,7 @@ fieldset[disabled] .form-control {
 }
 .datepicker--cell.-selected-,
 .datepicker--cell.-current-.-selected- {
-  background: #5E64FF;
+  background: #5e64ff;
 }
 .datepicker--cell.-in-range- {
   background: rgba(94, 100, 255, 0.05);
@@ -400,7 +402,7 @@ fieldset[disabled] .form-control {
   background: rgba(94, 100, 255, 0.9);
 }
 .datepicker--button {
-  color: #5E64FF;
+  color: #5e64ff;
 }
 .hidden-xs-inline,
 .hidden-xs-inline-block {
@@ -436,9 +438,9 @@ fieldset[disabled] .form-control {
   font-weight: normal;
 }
 .awesomplete > ul > li:hover,
-.awesomplete > ul > li[aria-selected=true] {
-  background-color: #F0F4F7;
-  color: #36414C;
+.awesomplete > ul > li[aria-selected="true"] {
+  background-color: #f0f4f7;
+  color: #36414c;
   text-shadow: none;
 }
 .awesomplete > ul a:hover {
@@ -472,7 +474,7 @@ fieldset[disabled] .form-control {
   }
 }
 .panel-bg {
-  background-color: #F7FAFC;
+  background-color: #f7fafc;
 }
 .light-bg {
   background-color: #fafbfc;
@@ -577,7 +579,7 @@ li.user-progress .progress-bar {
 .msg-box {
   padding: 30px 15px;
   text-align: center;
-  color: #8D99A6;
+  color: #8d99a6;
 }
 .no-border {
   border: none !important;
@@ -606,7 +608,7 @@ li.user-progress .progress-bar {
   padding: 15px 30px;
 }
 .file-upload .input-group-addon {
-  color: #8D99A6;
+  color: #8d99a6;
   font-size: 12px;
 }
 .file-upload .file-upload-or {
@@ -692,7 +694,7 @@ li.user-progress .progress-bar {
   max-width: 100%;
 }
 .help-modal a {
-  color: #5E64FF;
+  color: #5e64ff;
 }
 .help-modal .modal-dialog {
   width: 768px;
@@ -701,8 +703,8 @@ li.user-progress .progress-bar {
   padding: 15px 27px;
 }
 .help-modal .parent-link:before {
-  font-family: 'Octicons';
-  content: '\f0a4';
+  font-family: "Octicons";
+  content: "\f0a4";
 }
 .help-modal .edit-container {
   padding-bottom: 12px;
@@ -735,7 +737,7 @@ li.user-progress .progress-bar {
   margin: 0;
 }
 .note-editor .fa.fa-check {
-  color: #36414C !important;
+  color: #36414c !important;
 }
 .note-editor .dropdown-menu {
   z-index: 100;
@@ -761,11 +763,11 @@ li.user-progress .progress-bar {
   padding: 0;
 }
 .note-hint-popover .note-hint-item {
-  color: #36414C !important;
+  color: #36414c !important;
   padding: 5px 8.8px !important;
 }
 .note-hint-popover .note-hint-item.active {
-  background-color: #F0F4F7 !important;
+  background-color: #f0f4f7 !important;
 }
 .search-dialog .modal-dialog {
   width: 768px;
@@ -908,8 +910,8 @@ li.user-progress .progress-bar {
   margin-top: -10px;
 }
 .search-dialog .module-section .all-results-link:before {
-  font-family: 'Octicons';
-  content: '\f0a4';
+  font-family: "Octicons";
+  content: "\f0a4";
 }
 .search-dialog .module-section .result {
   margin-bottom: 5px;
@@ -979,17 +981,17 @@ li.user-progress .progress-bar {
   }
 }
 .note-editor.note-frame .note-editing-area .note-editable {
-  color: #36414C;
+  color: #36414c;
 }
 
-.input-area input[type=checkbox] {
+.input-area input[type="checkbox"] {
   margin-left: -20px;
 }
 
 .checkbox label {
   padding-left: 0px;
 }
-.checkbox input[type=checkbox] {
+.checkbox input[type="checkbox"] {
   margin-right: 5px;
   margin-left: 0px;
   position: relative;
@@ -1002,8 +1004,8 @@ input[type="checkbox"] {
 }
 input[type="checkbox"]:before {
   position: absolute;
-  font-family: 'FontAwesome';
-  content: '\f096';
+  font-family: "FontAwesome";
+  content: "\f096";
   visibility: visible;
   font-style: normal;
   font-weight: normal;
@@ -1019,10 +1021,10 @@ input[type="checkbox"]:before {
   left: 999999px;
 }
 input[type="checkbox"]:focus:before {
-  color: #8D99A6;
+  color: #8d99a6;
 }
 input[type="checkbox"]:checked:before {
-  content: '\f14a';
+  content: "\f14a";
   font-size: 13px;
   color: #3b99fc;
 }
@@ -1048,7 +1050,7 @@ input[type="checkbox"]:focus {
     left: 0;
   }
 }
-@supports (-ms-ime-align:auto) {
+@supports (-ms-ime-align: auto) {
   input[type="checkbox"] {
     visibility: visible;
     left: 0;
@@ -1140,7 +1142,7 @@ input[type="checkbox"]:focus {
 }
 .slides-wrapper .next-steps-links .title {
   text-transform: uppercase;
-  color: #8D99A6;
+  color: #8d99a6;
   font-size: 11px;
 }
 .slides-wrapper .btn-primary {

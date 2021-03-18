@@ -10,14 +10,14 @@ QUnit.test("test: Document Follow", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Document Follow
-		() => frappe.tests.make('Document Follow', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Document Follow", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

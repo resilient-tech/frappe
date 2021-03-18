@@ -3,17 +3,18 @@
 // and remove above this line
 QUnit.test("test: Note", function (assert) {
 	let done = assert.async();
- 	// number of asserts
+	// number of asserts
 	assert.expect(1);
- 	frappe.run_serially([
+	frappe.run_serially([
 		// insert a new Note
-		() => frappe.tests.make('Note', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Note", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
- });
+});

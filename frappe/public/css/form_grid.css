@@ -8,7 +8,7 @@
 }
 .grid-heading-row {
   border-bottom: 1px solid #d1d8dd;
-  background-color: #F7FAFC;
+  background-color: #f7fafc;
   font-weight: bold;
 }
 .grid-row {
@@ -64,7 +64,7 @@
   background-color: #fffdf4;
 }
 .validated-form .grid-static-col.error {
-  background-color: #FFDCDC;
+  background-color: #ffdcdc;
 }
 .grid-static-col input[type="checkbox"] {
   margin-left: -16px !important;
@@ -104,7 +104,7 @@
   top: 8px;
 }
 .grid-body .editable-row .form-control:focus {
-  border-color: #8D99A6;
+  border-color: #8d99a6;
   z-index: 2;
 }
 .grid-body .editable-row .has-error .form-control {

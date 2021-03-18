@@ -23,16 +23,16 @@ frappe.views.ImageView = class ImageView extends frappe.views.ListView {
 	set_fields() {
 		this.fields = [
 			"name",
-			...this.get_fields_in_list_view().map(el => el.fieldname),
+			...this.get_fields_in_list_view().map((el) => el.fieldname),
 			this.meta.title_field,
 			this.meta.image_field,
-			"_liked_by"
+			"_liked_by",
 		];
 	}
 
 	prepare_data(data) {
 		super.prepare_data(data);
-		this.items = this.data.map(d => {
+		this.items = this.data.map((d) => {
 			// absolute url if cordova, else relative
 			d._image_url = this.get_image_url(d);
 			return d;
@@ -68,9 +68,9 @@ frappe.views.ImageView = class ImageView extends frappe.views.ListView {
 	item_details_html(item) {
 		// TODO: Image view field in DocType
 		let info_fields =
-			this.get_fields_in_list_view().map(el => el.fieldname) || [];
+			this.get_fields_in_list_view().map((el) => el.fieldname) || [];
 		const title_field = this.meta.title_field || "name";
-		info_fields = info_fields.filter(field => field !== title_field);
+		info_fields = info_fields.filter((field) => field !== title_field);
 		let info_html = `<div><ul class="list-unstyled image-view-info">`;
 		let set = false;
 		info_fields.forEach((field, index) => {
@@ -131,7 +131,9 @@ frappe.views.ImageView = class ImageView extends frappe.views.ListView {
 					<div class="image-title">
 						<span class="ellipsis" title="${escaped_title}">
 							<a class="ellipsis" href="${this.get_form_link(item)}"
-								title="${escaped_title}" data-doctype="${this.doctype}" data-name="${item.name}">
+								title="${escaped_title}" data-doctype="${this.doctype}" data-name="${
+			item.name
+		}">
 								${title}
 							</a>
 						</span>
@@ -148,10 +150,10 @@ frappe.views.ImageView = class ImageView extends frappe.views.ListView {
 				method: "frappe.core.doctype.file.file.get_attached_images",
 				args: {
 					doctype: this.doctype,
-					names: this.items.map(i => i.name)
-				}
+					names: this.items.map((i) => i.name),
+				},
 			})
-			.then(r => {
+			.then((r) => {
 				this.images_map = Object.assign(
 					this.images_map || {},
 					r.message
@@ -183,9 +185,9 @@ frappe.views.ImageView = class ImageView extends frappe.views.ListView {
 			doctype: this.doctype,
 			items: this.items,
 			wrapper: this.$result,
-			images_map: this.images_map
+			images_map: this.images_map,
 		});
-		this.$result.on("click", ".zoom-view", function(e) {
+		this.$result.on("click", ".zoom-view", function (e) {
 			e.preventDefault();
 			e.stopPropagation();
 			var name = $(this).data().name;
@@ -197,16 +199,16 @@ frappe.views.ImageView = class ImageView extends frappe.views.ListView {
 };
 
 frappe.views.GalleryView = Class.extend({
-	init: function(opts) {
+	init: function (opts) {
 		$.extend(this, opts);
 		var me = this;
 
 		this.lib_ready = this.load_lib();
-		this.lib_ready.then(function() {
+		this.lib_ready.then(function () {
 			me.prepare();
 		});
 	},
-	prepare: function() {
+	prepare: function () {
 		// keep only one pswp dom element
 		this.pswp_root = $("body > .pswp");
 		if (this.pswp_root.length === 0) {
@@ -214,7 +216,7 @@ frappe.views.GalleryView = Class.extend({
 			this.pswp_root = $(pswp).appendTo("body");
 		}
 	},
-	prepare_pswp_items: function(_items, _images_map) {
+	prepare_pswp_items: function (_items, _images_map) {
 		var me = this;
 
 		if (_items) {
@@ -223,8 +225,8 @@ frappe.views.GalleryView = Class.extend({
 			this.images_map = _images_map;
 		}
 
-		return new Promise(resolve => {
-			const items = this.items.map(function(i) {
+		return new Promise((resolve) => {
+			const items = this.items.map(function (i) {
 				const query = 'img[data-name="' + i._name + '"]';
 				let el = me.wrapper.find(query).get(0);
 
@@ -248,26 +250,26 @@ frappe.views.GalleryView = Class.extend({
 					name: i.name,
 					w: width,
 					h: height,
-					el: el
+					el: el,
 				};
 			});
 			this.pswp_items = items;
 			resolve();
 		});
 	},
-	show: function(docname) {
+	show: function (docname) {
 		this.lib_ready
 			.then(() => this.prepare_pswp_items())
 			.then(() => this._show(docname));
 	},
-	_show: function(docname) {
+	_show: function (docname) {
 		const me = this;
 		const items = this.pswp_items;
-		const item_index = items.findIndex(item => item.name === docname);
+		const item_index = items.findIndex((item) => item.name === docname);
 
 		var options = {
 			index: item_index,
-			getThumbBoundsFn: function(index) {
+			getThumbBoundsFn: function (index) {
 				const query = 'img[data-name="' + items[index]._name + '"]';
 				let thumbnail = me.wrapper.find(query).get(0);
 
@@ -283,12 +285,12 @@ frappe.views.GalleryView = Class.extend({
 				return {
 					x: rect.left,
 					y: rect.top + pageYScroll,
-					w: rect.width
+					w: rect.width,
 				};
 			},
 			history: false,
 			shareEl: false,
-			showHideOpacity: true
+			showHideOpacity: true,
 		};
 
 		// init
@@ -301,12 +303,12 @@ frappe.views.GalleryView = Class.extend({
 		this.browse_images();
 		this.pswp.init();
 	},
-	browse_images: function() {
+	browse_images: function () {
 		const $more_items = this.pswp_root.find(".pswp__more-items");
 		const images_map = this.images_map;
 		let last_hide_timeout = null;
 
-		this.pswp.listen("afterChange", function() {
+		this.pswp.listen("afterChange", function () {
 			const images = images_map[this.currItem.name];
 			if (!images || images.length === 1) {
 				$more_items.html("");
@@ -325,10 +327,10 @@ frappe.views.GalleryView = Class.extend({
 		});
 
 		// Replace current image on click
-		$more_items.on("click", ".pswp__more-item", e => {
+		$more_items.on("click", ".pswp__more-item", (e) => {
 			const img_el = e.target;
 			const index = this.pswp.items.findIndex(
-				i => i.name === this.pswp.currItem.name
+				(i) => i.name === this.pswp.currItem.name
 			);
 
 			this.pswp.goTo(index);
@@ -336,7 +338,7 @@ frappe.views.GalleryView = Class.extend({
 				src: img_el.src,
 				w: img_el.naturalWidth,
 				h: img_el.naturalHeight,
-				name: this.pswp.currItem.name
+				name: this.pswp.currItem.name,
 			});
 			this.pswp.invalidateCurrItems();
 			this.pswp.updateSize(true);
@@ -365,18 +367,18 @@ frappe.views.GalleryView = Class.extend({
 			</div>`;
 		}
 	},
-	load_lib: function() {
-		return new Promise(resolve => {
+	load_lib: function () {
+		return new Promise((resolve) => {
 			var asset_dir = "assets/frappe/js/lib/photoswipe/";
 			frappe.require(
 				[
 					asset_dir + "photoswipe.css",
 					asset_dir + "default-skin.css",
 					asset_dir + "photoswipe.js",
-					asset_dir + "photoswipe-ui-default.js"
+					asset_dir + "photoswipe-ui-default.js",
 				],
 				resolve
 			);
 		});
-	}
+	},
 });

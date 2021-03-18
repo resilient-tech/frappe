@@ -10,14 +10,14 @@ QUnit.test("test: Report", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Report
-		() => frappe.tests.make('Report', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Report", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

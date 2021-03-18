@@ -11,10 +11,13 @@
 // 	}
 // })
 
-frappe.ui.form.on('DocType', {
-	refresh: function(frm) {
-		if(frappe.session.user !== "Administrator" || !frappe.boot.developer_mode) {
-			if(frm.is_new()) {
+frappe.ui.form.on("DocType", {
+	refresh: function (frm) {
+		if (
+			frappe.session.user !== "Administrator" ||
+			!frappe.boot.developer_mode
+		) {
+			if (frm.is_new()) {
 				frm.set_value("custom", 1);
 			}
 			frm.toggle_enable("custom", 0);
@@ -23,37 +26,41 @@ frappe.ui.form.on('DocType', {
 
 		if (!frm.is_new() && !frm.doc.istable) {
 			if (frm.doc.issingle) {
-				frm.add_custom_button(__('Go to {0}', [frm.doc.name]), () => {
+				frm.add_custom_button(__("Go to {0}", [frm.doc.name]), () => {
 					window.open(`/app/${frappe.router.slug(frm.doc.name)}`);
 				});
 			} else {
-				frm.add_custom_button(__('Go to {0} List', [frm.doc.name]), () => {
-					window.open(`/app/${frappe.router.slug(frm.doc.name)}`);
-				});
+				frm.add_custom_button(
+					__("Go to {0} List", [frm.doc.name]),
+					() => {
+						window.open(`/app/${frappe.router.slug(frm.doc.name)}`);
+					}
+				);
 			}
 		}
 
-		if(!frappe.boot.developer_mode && !frm.doc.custom) {
+		if (!frappe.boot.developer_mode && !frm.doc.custom) {
 			// make the document read-only
 			frm.set_read_only();
 		}
 
-		if(frm.is_new()) {
+		if (frm.is_new()) {
 			if (!(frm.doc.permissions && frm.doc.permissions.length)) {
-				frm.add_child('permissions', {role: 'System Manager'});
+				frm.add_child("permissions", { role: "System Manager" });
 			}
 		} else {
 			frm.toggle_enable("engine", 0);
 		}
 
 		// set label for "In List View" for child tables
-		frm.get_docfield('fields', 'in_list_view').label = frm.doc.istable ?
-			__('In Grid View') : __('In List View');
+		frm.get_docfield("fields", "in_list_view").label = frm.doc.istable
+			? __("In Grid View")
+			: __("In List View");
 
 		frm.events.autoname(frm);
 	},
 
-	autoname: function(frm) {
-		frm.set_df_property('fields', 'reqd', frm.doc.autoname !== 'Prompt');
-	}
-})
+	autoname: function (frm) {
+		frm.set_df_property("fields", "reqd", frm.doc.autoname !== "Prompt");
+	},
+});

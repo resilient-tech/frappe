@@ -10,14 +10,14 @@ QUnit.test("test: Data Migration Mapping", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Data Migration Mapping
-		() => frappe.tests.make('Data Migration Mapping', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Data Migration Mapping", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

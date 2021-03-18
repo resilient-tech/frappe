@@ -10,14 +10,14 @@ QUnit.test("test: Contact Us Settings", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Contact Us Settings
-		() => frappe.tests.make('Contact Us Settings', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Contact Us Settings", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

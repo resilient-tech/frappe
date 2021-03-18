@@ -1,4 +1,4 @@
-import Awesomplete from 'awesomplete';
+import Awesomplete from "awesomplete";
 
 frappe.ui.form.ControlAutocomplete = frappe.ui.form.ControlData.extend({
 	trigger_change_on_input_event: false,
@@ -22,7 +22,7 @@ frappe.ui.form.ControlAutocomplete = frappe.ui.form.ControlData.extend({
 			maxItems: this.df.max_items || 99,
 			autoFirst: true,
 			list: this.get_data(),
-			data: function(item) {
+			data: function (item) {
 				if (!(item instanceof Object)) {
 					var d = { value: item };
 					item = d;
@@ -30,14 +30,14 @@ frappe.ui.form.ControlAutocomplete = frappe.ui.form.ControlData.extend({
 
 				return {
 					label: item.label || item.value,
-					value: item.value
+					value: item.value,
 				};
 			},
-			filter: function(item, input) {
+			filter: function (item, input) {
 				let hay = item.label + item.value;
 				return Awesomplete.FILTER_CONTAINS(hay, input);
 			},
-			item: function(item) {
+			item: function (item) {
 				var d = this.get_item(item.value);
 				if (!d) {
 					d = item;
@@ -48,20 +48,23 @@ frappe.ui.form.ControlAutocomplete = frappe.ui.form.ControlData.extend({
 				}
 
 				var _label = me.translate_values ? __(d.label) : d.label;
-				var html = '<strong>' + _label + '</strong>';
+				var html = "<strong>" + _label + "</strong>";
 				if (d.description) {
-					html += '<br><span class="small">' + __(d.description) + '</span>';
+					html +=
+						'<br><span class="small">' +
+						__(d.description) +
+						"</span>";
 				}
 
-				return $('<li></li>')
-					.data('item.autocomplete', d)
-					.prop('aria-selected', 'false')
-					.html('<a><p>' + html + '</p></a>')
+				return $("<li></li>")
+					.data("item.autocomplete", d)
+					.prop("aria-selected", "false")
+					.html("<a><p>" + html + "</p></a>")
 					.get(0);
 			},
 			sort: () => {
 				return 0;
-			}
+			},
 		};
 	},
 
@@ -71,64 +74,76 @@ frappe.ui.form.ControlAutocomplete = frappe.ui.form.ControlData.extend({
 			this.get_awesomplete_settings()
 		);
 
-		$(this.input_area)
-			.find('.awesomplete ul')
-			.css('min-width', '100%');
+		$(this.input_area).find(".awesomplete ul").css("min-width", "100%");
 
 		this.$input.on(
-			'input',
+			"input",
 			frappe.utils.debounce(() => {
 				this.awesomplete.list = this.get_data();
 			}, 500)
 		);
 
-		this.$input.on('focus', () => {
+		this.$input.on("focus", () => {
 			if (!this.$input.val()) {
-				this.$input.val('');
-				this.$input.trigger('input');
+				this.$input.val("");
+				this.$input.trigger("input");
 			}
 		});
 
 		this.$input.on("awesomplete-open", () => {
-			this.toggle_container_scroll('.modal-dialog', 'modal-dialog-scrollable');
-			this.toggle_container_scroll('.grid-form-body .form-area', 'scrollable');
+			this.toggle_container_scroll(
+				".modal-dialog",
+				"modal-dialog-scrollable"
+			);
+			this.toggle_container_scroll(
+				".grid-form-body .form-area",
+				"scrollable"
+			);
 
 			this.autocomplete_open = true;
 		});
 
 		this.$input.on("awesomplete-close", () => {
-			this.toggle_container_scroll('.modal-dialog', 'modal-dialog-scrollable', true);
-			this.toggle_container_scroll('.grid-form-body .form-area', 'scrollable', true);
+			this.toggle_container_scroll(
+				".modal-dialog",
+				"modal-dialog-scrollable",
+				true
+			);
+			this.toggle_container_scroll(
+				".grid-form-body .form-area",
+				"scrollable",
+				true
+			);
 
 			this.autocomplete_open = false;
 		});
 
-		this.$input.on('awesomplete-selectcomplete', () => {
-			this.$input.trigger('change');
+		this.$input.on("awesomplete-selectcomplete", () => {
+			this.$input.trigger("change");
 		});
 	},
 
 	validate(value) {
 		if (this.df.ignore_validation) {
-			return value || '';
+			return value || "";
 		}
-		let valid_values = this.awesomplete._list.map(d => d.value);
+		let valid_values = this.awesomplete._list.map((d) => d.value);
 		if (!valid_values.length) {
 			return value;
 		}
 		if (valid_values.includes(value)) {
 			return value;
 		} else {
-			return '';
+			return "";
 		}
 	},
 
 	parse_options(options) {
-		if (typeof options === 'string') {
-			options = options.split('\n');
+		if (typeof options === "string") {
+			options = options.split("\n");
 		}
-		if (typeof options[0] === 'string') {
-			options = options.map(o => ({ label: o, value: o }));
+		if (typeof options[0] === "string") {
+			options = options.map((o) => ({ label: o, value: o }));
 		}
 		return options;
 	},
@@ -143,5 +158,5 @@ frappe.ui.form.ControlAutocomplete = frappe.ui.form.ControlData.extend({
 			this.awesomplete.list = data;
 		}
 		this._data = data;
-	}
+	},
 });

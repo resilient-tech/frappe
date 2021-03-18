@@ -1,36 +1,43 @@
 // Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 // MIT License. See license.txt
 
-frappe.provide('frappe.views.list_view');
+frappe.provide("frappe.views.list_view");
 
 window.cur_list = null;
 frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
-	make (route) {
+	make(route) {
 		var me = this;
 		var doctype = route[1];
 
 		frappe.model.with_doctype(doctype, function () {
-			if (locals['DocType'][doctype].issingle) {
-				frappe.set_re_route('Form', doctype);
+			if (locals["DocType"][doctype].issingle) {
+				frappe.set_re_route("Form", doctype);
 			} else {
 				// List / Gantt / Kanban / etc
 				// File is a special view
-				const view_name = doctype !== 'File' ? frappe.utils.to_title_case(route[2] || 'List') : 'File';
-				let view_class = frappe.views[view_name + 'View'];
+				const view_name =
+					doctype !== "File"
+						? frappe.utils.to_title_case(route[2] || "List")
+						: "File";
+				let view_class = frappe.views[view_name + "View"];
 				if (!view_class) view_class = frappe.views.ListView;
 
-				if (view_class && view_class.load_last_view && view_class.load_last_view()) {
+				if (
+					view_class &&
+					view_class.load_last_view &&
+					view_class.load_last_view()
+				) {
 					// view can have custom routing logic
 					return;
 				}
 
-				frappe.provide('frappe.views.list_view.' + doctype);
+				frappe.provide("frappe.views.list_view." + doctype);
 				const page_name = frappe.get_route_str();
 
 				if (!frappe.views.list_view[page_name]) {
 					frappe.views.list_view[page_name] = new view_class({
 						doctype: doctype,
-						parent: me.make_page(true, page_name)
+						parent: me.make_page(true, page_name),
 					});
 				} else {
 					frappe.container.change_to(page_name);
@@ -54,8 +61,16 @@ frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
 		var route = frappe.get_route();
 		var doctype = route[1];
 		var last_route = frappe.route_history.slice(-2)[0];
-		if (route[0] === 'List' && route.length === 2 && frappe.views.list_view[doctype]) {
-			if(last_route && last_route[0]==='List' && last_route[1]===doctype) {
+		if (
+			route[0] === "List" &&
+			route.length === 2 &&
+			frappe.views.list_view[doctype]
+		) {
+			if (
+				last_route &&
+				last_route[0] === "List" &&
+				last_route[1] === doctype
+			) {
 				// last route same as this route, so going back.
 				// this happens because /app/List/Item will redirect to /app/List/Item/List
 				// while coming from back button, the last 2 routes will be same, so
@@ -75,11 +90,15 @@ frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
 
 	set_module_breadcrumb() {
 		if (frappe.route_history.length > 1) {
-			var prev_route = frappe.route_history[frappe.route_history.length - 2];
-			if (prev_route[0] === 'modules') {
+			var prev_route =
+				frappe.route_history[frappe.route_history.length - 2];
+			if (prev_route[0] === "modules") {
 				var doctype = frappe.get_route()[1],
 					module = prev_route[1];
-				if (frappe.module_links[module] && frappe.module_links[module].includes(doctype)) {
+				if (
+					frappe.module_links[module] &&
+					frappe.module_links[module].includes(doctype)
+				) {
 					// save the last page from the breadcrumb was accessed
 					frappe.breadcrumbs.set_doctype_module(doctype, module);
 				}
@@ -96,4 +115,4 @@ frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
 			window.cur_list = null;
 		}
 	}
-}
+};

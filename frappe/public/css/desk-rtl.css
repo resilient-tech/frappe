@@ -1,8 +1,8 @@
-.navbar .navbar-search-icon{
+.navbar .navbar-search-icon {
   right: auto;
   left: 24px;
 }
-.navbar > .container > .navbar-header{
+.navbar > .container > .navbar-header {
   float: right !important;
 }
 body[data-sidebar="0"] .navbar-home {
@@ -15,16 +15,16 @@ body[data-sidebar="0"] .navbar-home {
 body.no-breadcrumbs .navbar .navbar-home:before {
   margin-right: auto;
   margin-left: 10px !important;
-  -ms-transform:rotate(180deg);     /* Internet Explorer 9 */
-  -webkit-transform:rotate(180deg); /* Chrome, Safari, Opera */
-  transform:rotate(180deg);         /* Standard syntax */
+  -ms-transform: rotate(180deg); /* Internet Explorer 9 */
+  -webkit-transform: rotate(180deg); /* Chrome, Safari, Opera */
+  transform: rotate(180deg); /* Standard syntax */
 }
 .layout-side-section .overlay-sidebar {
   left: auto !important;
   right: 0 !important;
 }
 .layout-side-section .overlay-sidebar.opened {
-  transform:translateX(0) !important;
+  transform: translateX(0) !important;
 }
 .navbar-right {
   float: left !important;
@@ -33,17 +33,17 @@ body.no-breadcrumbs .navbar .navbar-home:before {
   margin-right: auto;
   margin-left: 10px;
   top: 6px;
-  -ms-transform:rotate(180deg);     /* Internet Explorer 9 */
-  -webkit-transform:rotate(180deg); /* Chrome, Safari, Opera */
-  transform:rotate(180deg);         /* Standard syntax */
+  -ms-transform: rotate(180deg); /* Internet Explorer 9 */
+  -webkit-transform: rotate(180deg); /* Chrome, Safari, Opera */
+  transform: rotate(180deg); /* Standard syntax */
 }
 .case-wrapper {
   float: right;
 }
 .link-btn {
   right: auto;
-  left:  4px;
-  transform:rotate(180deg);         /* Rotate icon*/
+  left: 4px;
+  transform: rotate(180deg); /* Rotate icon*/
 }
 .sidebar-menu .badge {
   right: auto;
@@ -87,15 +87,20 @@ ul.tree-children {
 .balance-area {
   float: left !important;
 }
-.tree.opened::before, .tree-node.opened::before, .tree:last-child::after, .tree-node:last-child::after {
+.tree.opened::before,
+.tree-node.opened::before,
+.tree:last-child::after,
+.tree-node:last-child::after {
   left: inherit !important;
   right: 8px;
 }
-.tree.opened > .tree-children > .tree-node > .tree-link::before, .tree-node.opened > .tree-children > .tree-node > .tree-link::before {
+.tree.opened > .tree-children > .tree-node > .tree-link::before,
+.tree-node.opened > .tree-children > .tree-node > .tree-link::before {
   left: inherit !important;
   right: -11px;
 }
-.tree:last-child::after, .tree-node:last-child::after {
+.tree:last-child::after,
+.tree-node:last-child::after {
   right: -13px !important;
 }
 .tree.opened::before {

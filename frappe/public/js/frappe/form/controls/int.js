@@ -13,8 +13,9 @@ frappe.ui.form.ControlInt = frappe.ui.form.ControlData.extend({
 			.on("focus", function () {
 				setTimeout(function () {
 					if (!document.activeElement) return;
-					document.activeElement.value
-						= me.validate(document.activeElement.value);
+					document.activeElement.value = me.validate(
+						document.activeElement.value
+					);
 					document.activeElement.select();
 				}, 100);
 				return false;
@@ -24,7 +25,7 @@ frappe.ui.form.ControlInt = frappe.ui.form.ControlData.extend({
 		return this.parse(value);
 	},
 	eval_expression: function (value) {
-		if (typeof value === 'string') {
+		if (typeof value === "string") {
 			if (value.match(/^[0-9+\-/* ]+$/)) {
 				// If it is a string containing operators
 				try {
@@ -39,5 +40,5 @@ frappe.ui.form.ControlInt = frappe.ui.form.ControlData.extend({
 	},
 	parse: function (value) {
 		return cint(this.eval_expression(value), null);
-	}
+	},
 });

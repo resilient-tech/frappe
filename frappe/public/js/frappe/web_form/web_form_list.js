@@ -9,13 +9,13 @@ export default class WebFormList {
 		this.wrapper = document.getElementById("datatable");
 		this.make_actions();
 		this.make_filters();
-		$('.link-btn').remove();
+		$(".link-btn").remove();
 	}
 
 	refresh() {
 		if (this.table) {
-			Array.from(this.table.tBodies).forEach(tbody => tbody.remove());
-			let check = document.getElementById('select-all');
+			Array.from(this.table.tBodies).forEach((tbody) => tbody.remove());
+			let check = document.getElementById("select-all");
 			check.checked = false;
 		}
 		this.rows = [];
@@ -26,53 +26,67 @@ export default class WebFormList {
 			() => this.get_list_view_fields(),
 			() => this.get_data(),
 			() => this.make_table(),
-			() => this.create_more()
+			() => this.create_more(),
 		]);
 	}
 
 	make_filters() {
 		this.filters = {};
 		this.filter_input = [];
-		const filter_area = document.getElementById('list-filters');
+		const filter_area = document.getElementById("list-filters");
 
-		frappe.call('frappe.website.doctype.web_form.web_form.get_web_form_filters', {
-			web_form_name: this.web_form_name
-		}).then(response => {
-			let fields = response.message;
-			fields.forEach(field => {
-				let col = document.createElement('div.col-sm-4');
-				col.classList.add('col', 'col-sm-3');
-				filter_area.appendChild(col);
-				if (field.default) this.add_filter(field.fieldname, field.default, field.fieldtype);
+		frappe
+			.call(
+				"frappe.website.doctype.web_form.web_form.get_web_form_filters",
+				{
+					web_form_name: this.web_form_name,
+				}
+			)
+			.then((response) => {
+				let fields = response.message;
+				fields.forEach((field) => {
+					let col = document.createElement("div.col-sm-4");
+					col.classList.add("col", "col-sm-3");
+					filter_area.appendChild(col);
+					if (field.default)
+						this.add_filter(
+							field.fieldname,
+							field.default,
+							field.fieldtype
+						);
 
-				let input = frappe.ui.form.make_control({
-					df: {
-						fieldtype: field.fieldtype,
-						fieldname: field.fieldname,
-						options: field.options,
-						only_select: true,
-						label: __(field.label),
-						onchange: (event) => {
-							$('#more').remove();
-							this.add_filter(field.fieldname, input.value, field.fieldtype);
-							this.refresh();
-						}
-					},
-					parent: col,
-					value: field.default,
-					render_input: 1,
+					let input = frappe.ui.form.make_control({
+						df: {
+							fieldtype: field.fieldtype,
+							fieldname: field.fieldname,
+							options: field.options,
+							only_select: true,
+							label: __(field.label),
+							onchange: (event) => {
+								$("#more").remove();
+								this.add_filter(
+									field.fieldname,
+									input.value,
+									field.fieldtype
+								);
+								this.refresh();
+							},
+						},
+						parent: col,
+						value: field.default,
+						render_input: 1,
+					});
+					this.filter_input.push(input);
 				});
-				this.filter_input.push(input);
+				this.refresh();
 			});
-			this.refresh();
-		});
 	}
 
 	add_filter(field, value, fieldtype) {
 		if (!value) {
 			delete this.filters[field];
 		} else {
-			if (fieldtype === 'Data') value = ['like', value + '%'];
+			if (fieldtype === "Data") value = ["like", value + "%"];
 			Object.assign(this.filters, Object.fromEntries([[field, value]]));
 		}
 	}
@@ -82,9 +96,9 @@ export default class WebFormList {
 			.call({
 				method:
 					"frappe.website.doctype.web_form.web_form.get_in_list_view_fields",
-				args: { doctype: this.doctype }
+				args: { doctype: this.doctype },
 			})
-			.then(response => (this.fields_list = response.message));
+			.then((response) => (this.fields_list = response.message));
 	}
 
 	fetch_data() {
@@ -92,11 +106,11 @@ export default class WebFormList {
 			method: "frappe.www.list.get_list_data",
 			args: {
 				doctype: this.doctype,
-				fields: this.fields_list.map(df => df.fieldname),
+				fields: this.fields_list.map((df) => df.fieldname),
 				limit_start: this.web_list_start,
 				web_form_name: this.web_form_name,
-				...this.filters
-			}
+				...this.filters,
+			},
 		});
 	}
 
@@ -113,15 +127,14 @@ export default class WebFormList {
 			}
 			this.append_rows(res.message);
 		});
-
 	}
 
 	make_table() {
-		this.columns = this.fields_list.map(df => {
+		this.columns = this.fields_list.map((df) => {
 			return {
 				label: df.label,
 				fieldname: df.fieldname,
-				fieldtype: df.fieldtype
+				fieldtype: df.fieldtype,
 			};
 		});
 
@@ -148,14 +161,14 @@ export default class WebFormList {
 		let checkbox = document.createElement("input");
 		checkbox.type = "checkbox";
 		checkbox.id = "select-all";
-		checkbox.onclick = event =>
+		checkbox.onclick = (event) =>
 			this.toggle_select_all(event.target.checked);
 
 		th.appendChild(checkbox);
 		row.appendChild(th);
 
 		add_heading(row, __("Sr"));
-		this.columns.forEach(col => {
+		this.columns.forEach((col) => {
 			add_heading(row, __(col.label));
 		});
 
@@ -179,8 +192,8 @@ export default class WebFormList {
 				serial_number: this.rows.length + 1,
 				events: {
 					onEdit: () => this.open_form(data_item.name),
-					onSelect: () => this.toggle_delete()
-				}
+					onSelect: () => this.toggle_delete(),
+				},
 			});
 
 			this.rows.push(row);
@@ -215,8 +228,7 @@ export default class WebFormList {
 				"ml-2",
 				"text-white"
 			);
-		}
-		else if (type == "danger") {
+		} else if (type == "danger") {
 			button.classList.add(
 				"btn",
 				"btn-danger",
@@ -224,8 +236,7 @@ export default class WebFormList {
 				"btn-sm",
 				"ml-2"
 			);
-		}
-		else {
+		} else {
 			button.classList.add("btn", "btn-primary", "btn-sm", "ml-2");
 		}
 
@@ -240,12 +251,14 @@ export default class WebFormList {
 	create_more() {
 		if (this.rows.length >= this.page_length) {
 			const footer = document.querySelector(".list-view-footer");
-			this.addButton(footer, "more", "secondary", false, "More", () =>  this.more());
+			this.addButton(footer, "more", "secondary", false, "More", () =>
+				this.more()
+			);
 		}
 	}
 
 	toggle_select_all(checked) {
-		this.rows.forEach(row => row.toggle_select(checked));
+		this.rows.forEach((row) => row.toggle_select(checked));
 	}
 
 	open_form(name) {
@@ -253,17 +266,17 @@ export default class WebFormList {
 	}
 
 	get_selected() {
-		return this.rows.filter(row => row.is_selected());
+		return this.rows.filter((row) => row.is_selected());
 	}
 
 	toggle_delete() {
-		if (!this.settings.allow_delete) return
+		if (!this.settings.allow_delete) return;
 		let btn = document.getElementById("delete-rows");
 		btn.hidden = !this.get_selected().length;
 	}
 
 	delete_rows() {
-		if (!this.settings.allow_delete) return
+		if (!this.settings.allow_delete) return;
 		frappe
 			.call({
 				type: "POST",
@@ -271,15 +284,15 @@ export default class WebFormList {
 					"frappe.website.doctype.web_form.web_form.delete_multiple",
 				args: {
 					web_form_name: this.web_form_name,
-					docnames: this.get_selected().map(row => row.doc.name)
-				}
+					docnames: this.get_selected().map((row) => row.doc.name),
+				},
 			})
 			.then(() => {
-				this.refresh()
-				this.toggle_delete()
+				this.refresh();
+				this.toggle_delete();
 			});
 	}
-};
+}
 
 frappe.ui.WebFormListRow = class WebFormListRow {
 	constructor({ row, doc, columns, serial_number, events, options }) {
@@ -293,10 +306,10 @@ frappe.ui.WebFormListRow = class WebFormListRow {
 
 		this.checkbox = document.createElement("input");
 		this.checkbox.type = "checkbox";
-		this.checkbox.onclick = event => {
+		this.checkbox.onclick = (event) => {
 			this.toggle_select(event.target.checked);
 			event.stopImmediatePropagation();
-		}
+		};
 
 		cell.appendChild(this.checkbox);
 
@@ -304,11 +317,20 @@ frappe.ui.WebFormListRow = class WebFormListRow {
 		let serialNo = this.row.insertCell();
 		serialNo.innerText = this.serial_number;
 
-		this.columns.forEach(field => {
+		this.columns.forEach((field) => {
 			let cell = this.row.insertCell();
 			let formatter = frappe.form.get_formatter(field.fieldtype);
-			cell.innerHTML = this.doc[field.fieldname] &&
-				__(formatter(this.doc[field.fieldname], field, {only_value: 1}, this.doc)) || "";
+			cell.innerHTML =
+				(this.doc[field.fieldname] &&
+					__(
+						formatter(
+							this.doc[field.fieldname],
+							field,
+							{ only_value: 1 },
+							this.doc
+						)
+					)) ||
+				"";
 		});
 
 		this.row.onclick = () => this.events.onEdit();

@@ -10,14 +10,14 @@ QUnit.test("test: Data Migration Connector", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Data Migration Connector
-		() => frappe.tests.make('Data Migration Connector', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Data Migration Connector", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

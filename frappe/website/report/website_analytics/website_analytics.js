@@ -3,15 +3,18 @@
 /* eslint-disable */
 
 frappe.query_reports["Website Analytics"] = {
-	"filters": [
+	filters: [
 		{
 			fieldname: "from_date",
 			label: __("From Date"),
 			fieldtype: "Date",
-			default: frappe.datetime.add_days(frappe.datetime.now_date(true), -100),
+			default: frappe.datetime.add_days(
+				frappe.datetime.now_date(true),
+				-100
+			),
 		},
 		{
-			fieldname:"to_date",
+			fieldname: "to_date",
 			label: __("To Date"),
 			fieldtype: "Date",
 			default: frappe.datetime.now_date(true),
@@ -21,12 +24,12 @@ frappe.query_reports["Website Analytics"] = {
 			label: __("Range"),
 			fieldtype: "Select",
 			options: [
-				{ "value": "Daily", "label": __("Daily") },
-				{ "value": "Weekly", "label": __("Weekly") },
-				{ "value": "Monthly", "label": __("Monthly") },
+				{ value: "Daily", label: __("Daily") },
+				{ value: "Weekly", label: __("Weekly") },
+				{ value: "Monthly", label: __("Monthly") },
 			],
 			default: "Daily",
-			reqd: 1
-		}
-	]
+			reqd: 1,
+		},
+	],
 };

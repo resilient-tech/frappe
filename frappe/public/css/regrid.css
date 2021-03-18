@@ -18,7 +18,7 @@
   height: 36px;
 }
 .data-table .edit-cell {
-  border: 2px solid #7679FC;
+  border: 2px solid #7679fc;
 }
 .data-table .checkbox {
   margin-top: 8px;
@@ -29,5 +29,5 @@
   overflow: hidden;
 }
 .data-table .data-table-col.selected .content {
-  border-color: #7679FC;
+  border-color: #7679fc;
 }

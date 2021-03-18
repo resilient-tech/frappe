@@ -10,14 +10,14 @@ QUnit.test("test: S3 Backup Settings", function (assert) {
 
 	frappe.run_serially([
 		// insert a new S3 Backup Settings
-		() => frappe.tests.make('S3 Backup Settings', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("S3 Backup Settings", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

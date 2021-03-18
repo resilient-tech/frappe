@@ -8,16 +8,16 @@ QUnit.test("test: System Settings", function (assert) {
 	// number of asserts
 	assert.expect(1);
 
-	frappe.run_serially('System Settings', [
+	frappe.run_serially("System Settings", [
 		// insert a new System Settings
-		() => frappe.tests.make([
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make([
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

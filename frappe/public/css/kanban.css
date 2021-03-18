@@ -53,11 +53,11 @@
 .kanban .kanban-card.add-card {
   background-color: transparent;
   box-shadow: none;
-  color: #8D99A6;
+  color: #8d99a6;
 }
 .kanban .kanban-card.add-card:hover {
   box-shadow: none;
-  color: #36414C;
+  color: #36414c;
   cursor: pointer;
 }
 .kanban .kanban-card.add-card .octicon-plus {
@@ -115,7 +115,7 @@
   outline: none;
 }
 .kanban .add-new-column a:hover {
-  color: #36414C !important;
+  color: #36414c !important;
 }
 .kanban .kanban-card-meta {
   margin-top: 8px;
@@ -130,7 +130,7 @@
   line-height: 400px;
 }
 body[data-route*="Kanban"] .modal .add-assignment:hover i {
-  color: #36414C !important;
+  color: #36414c !important;
 }
 .edit-card-title .h4 {
   margin-top: 5px;

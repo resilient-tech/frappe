@@ -1,21 +1,21 @@
 .version-info {
-	overflow: auto;
+  overflow: auto;
 }
 
 .version-info pre {
-	border: 0px;
-	margin: 0px;
-	background-color: inherit;
+  border: 0px;
+  margin: 0px;
+  background-color: inherit;
 }
 
 .version-info .table {
-	background-color: inherit;
+  background-color: inherit;
 }
 
 .version-info .success {
-	background-color: #dff0d8 !important;
+  background-color: #dff0d8 !important;
 }
 
 .version-info .danger {
-	background-color: #f2dede !important;
+  background-color: #f2dede !important;
 }

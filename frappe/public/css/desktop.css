@@ -208,7 +208,7 @@ body[data-route="desktop"] .navbar-default {
 }
 .desktop-list-item:hover,
 .desktop-list-item:focus {
-  background-color: #F7FAFC;
+  background-color: #f7fafc;
 }
 .desktop-list-item h4 {
   display: inline-block;
@@ -243,7 +243,7 @@ body[data-route="desktop"] .navbar-set-desktop-icons {
   font-size: 12px;
 }
 .help-message-wrapper .octicon {
-  color: #8D99A6;
+  color: #8d99a6;
   cursor: pointer;
   width: 20px;
 }
@@ -251,7 +251,7 @@ body[data-route="desktop"] .navbar-set-desktop-icons {
   color: #d1d8dd;
 }
 .help-message-wrapper .octicon:hover {
-  color: #36414C;
+  color: #36414c;
   text-decoration: none;
 }
 .help-message-wrapper .left-arrow {
@@ -267,7 +267,7 @@ body[data-route="desktop"] .navbar-set-desktop-icons {
   text-align: right;
 }
 .help-message-wrapper .indicator {
-  color: #36414C;
+  color: #36414c;
 }
 .help-message-wrapper .help-progress {
   display: inline-block;
@@ -286,7 +286,7 @@ body[data-route="desktop"] .navbar-set-desktop-icons {
 .help-message-wrapper .help-progress-bar {
   display: inline-block;
   height: 4px;
-  background-color: #5E64FF;
+  background-color: #5e64ff;
   float: left;
   border-radius: 2px;
 }

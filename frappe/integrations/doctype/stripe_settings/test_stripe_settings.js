@@ -10,14 +10,14 @@ QUnit.test("test: Stripe Settings", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Stripe Settings
-		() => frappe.tests.make('Stripe Settings', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Stripe Settings", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

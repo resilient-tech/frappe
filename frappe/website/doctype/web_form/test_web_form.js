@@ -10,14 +10,14 @@ QUnit.test("test: Web Form", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Web Form
-		() => frappe.tests.make('Web Form', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Web Form", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

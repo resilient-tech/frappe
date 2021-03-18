@@ -7,8 +7,8 @@
   margin-right: -1px;
 }
 th.fc-widget-header {
-  background-color: #F7FAFC;
-  color: #8C99A5;
+  background-color: #f7fafc;
+  color: #8c99a5;
 }
 .fc-unthemed th,
 .fc-unthemed td,
@@ -20,10 +20,10 @@ th.fc-widget-header {
   border-color: #d1d8dd !important;
 }
 .fc-unthemed .fc-today {
-  background-color: #FFF !important;
+  background-color: #fff !important;
 }
 .fc-unthemed .fc-today .fc-day-number {
-  background-color: #5E64FF;
+  background-color: #5e64ff;
   min-width: 20px;
   border-radius: 50%;
   color: #fff;
@@ -33,9 +33,9 @@ th.fc-widget-header {
   background-color: #fffce7 !important;
 }
 .fc-event {
-  border: 1px solid #E8DDFF;
+  border: 1px solid #e8ddff;
   /* default BORDER color */
-  background-color: #E8DDFF;
+  background-color: #e8ddff;
 }
 @media (max-width: 767px) {
   .fc-scroller {
@@ -78,44 +78,44 @@ th.fc-day-header {
   padding: 1px 5px !important;
 }
 .fc-bg-orange {
-  background-color: #FDD2C2 !important;
-  color: #A64F33 !important;
+  background-color: #fdd2c2 !important;
+  color: #a64f33 !important;
 }
 .fc-bg-orange.fc-start {
-  border-left: 3px solid #FDA688 !important;
+  border-left: 3px solid #fda688 !important;
 }
 .fc-bg-red {
-  background-color: #FEC3C5 !important;
-  color: #A63336 !important;
+  background-color: #fec3c5 !important;
+  color: #a63336 !important;
 }
 .fc-bg-red.fc-start {
-  border-left: 3px solid #FD8B8B !important;
+  border-left: 3px solid #fd8b8b !important;
 }
 .fc-bg-skyblue {
-  background-color: #D4F1FF !important;
-  color: #548DA8 !important;
+  background-color: #d4f1ff !important;
+  color: #548da8 !important;
 }
 .fc-bg-skyblue.fc-start {
-  border-left: 3px solid #AAE3FE !important;
+  border-left: 3px solid #aae3fe !important;
 }
 .fc-bg-green {
-  background-color: #EBF7CF !important;
-  color: #7C9142 !important;
+  background-color: #ebf7cf !important;
+  color: #7c9142 !important;
 }
 .fc-bg-green.fc-start {
-  border-left: 3px solid #D9F29E !important;
+  border-left: 3px solid #d9f29e !important;
 }
 .fc-bg-blue {
-  background-color: #D1D3FC !important;
-  color: #4C51A2 !important;
+  background-color: #d1d3fc !important;
+  color: #4c51a2 !important;
 }
 .fc-bg-blue.fc-start {
-  border-left: 3px solid #A3A5FC !important;
+  border-left: 3px solid #a3a5fc !important;
 }
 .fc-bg-yellow {
-  background-color: #FEF9CF !important;
-  color: #A99E4C !important;
+  background-color: #fef9cf !important;
+  color: #a99e4c !important;
 }
 .fc-bg-yellow.fc-start {
-  border-left: 3px solid #FFF5A0 !important;
+  border-left: 3px solid #fff5a0 !important;
 }

@@ -10,14 +10,14 @@ QUnit.test("test: Social Login Key", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Social Login Key
-		() => frappe.tests.make('Social Login Key', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Social Login Key", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

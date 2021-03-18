@@ -10,14 +10,14 @@ QUnit.test("test: Page", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Page
-		() => frappe.tests.make('Page', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Page", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

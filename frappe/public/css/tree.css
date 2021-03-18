@@ -14,7 +14,7 @@ ul.tree-children {
   padding: 1px;
 }
 .tree-link .node-parent {
-  color: #8D99A6;
+  color: #8d99a6;
   font-size: 14px;
   width: 10px;
   text-align: center;
@@ -30,10 +30,10 @@ ul.tree-children {
   color: #5e64ff;
 }
 .tree-link.active a {
-  color: #8D99A6;
+  color: #8d99a6;
 }
 .tree-hover {
-  background-color: #F7FAFC;
+  background-color: #f7fafc;
   min-height: 20px;
   border: 1px solid #d1d8dd;
 }
@@ -57,7 +57,7 @@ ul.tree-children {
 .tree.with-skeleton .tree-node.opened::before,
 .tree.with-skeleton:last-child::after,
 .tree.with-skeleton .tree-node:last-child::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 16px;
   left: 8px;
@@ -75,8 +75,12 @@ ul.tree-children {
   background: #fff;
 }
 .tree.with-skeleton.opened > .tree-children > .tree-node > .tree-link::before,
-.tree.with-skeleton .tree-node.opened > .tree-children > .tree-node > .tree-link::before {
-  content: '';
+.tree.with-skeleton
+  .tree-node.opened
+  > .tree-children
+  > .tree-node
+  > .tree-link::before {
+  content: "";
   position: absolute;
   width: 15px;
   height: 1px;
@@ -91,5 +95,5 @@ ul.tree-children {
   height: calc(100% - 67px);
 }
 .tree-link.active ~ .balance-area {
-  color: #36414C !important;
+  color: #36414c !important;
 }

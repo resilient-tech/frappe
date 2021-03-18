@@ -8,16 +8,16 @@ QUnit.test("test: User Permission", function (assert) {
 	// number of asserts
 	assert.expect(1);
 
-	frappe.run_serially('User Permission', [
+	frappe.run_serially("User Permission", [
 		// insert a new User Permission
-		() => frappe.tests.make([
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make([
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

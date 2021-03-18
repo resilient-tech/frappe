@@ -1,8 +1,8 @@
 .gantt .bar-milestone .bar {
-  fill: #FD8B8B;
+  fill: #fd8b8b;
 }
 .gantt .bar-milestone .bar-progress {
-  fill: #FC4F51;
+  fill: #fc4f51;
 }
 .frappe-rtl .gantt {
   direction: ltr;

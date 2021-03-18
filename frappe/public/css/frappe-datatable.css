@@ -36,8 +36,8 @@
   display: none;
 }
 .data-table .data-table-header {
-  background-color: #F7FAFC;
-  color: #8D99A6;
+  background-color: #f7fafc;
+  color: #8d99a6;
 }
 .data-table .data-table-row.row-update {
   animation: 500ms breathe forwards;

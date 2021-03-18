@@ -10,14 +10,14 @@ QUnit.test("test: Braintree Settings", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Braintree Setting
-		() => frappe.tests.make('Braintree Settings', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Braintree Settings", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

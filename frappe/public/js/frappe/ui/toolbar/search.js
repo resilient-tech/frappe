@@ -9,7 +9,7 @@ frappe.search.SearchDialog = class {
 	make() {
 		this.search_dialog = new frappe.ui.Dialog({
 			minimizable: true,
-			size: "large"
+			size: "large",
 		});
 		this.set_header();
 		this.$wrapper = $(this.search_dialog.$wrapper).addClass(
@@ -58,38 +58,38 @@ frappe.search.SearchDialog = class {
 					frappe.search.utils
 						.get_global_results(keywords, start, limit)
 						.then(
-							global_results => {
+							(global_results) => {
 								results = results.concat(global_results);
 								callback(results, keywords);
 							},
-							err => {
+							(err) => {
 								// eslint-disable-next-line no-console
 								console.error(err);
 							}
 						);
-				}
+				},
 			},
 			tags: {
 				input_placeholder: __("Search"),
 				empty_state_text: __("Search for anything"),
-				no_results_status: keyword =>
+				no_results_status: (keyword) =>
 					"<div>" +
 					__("No documents found tagged with {0}", [keyword]) +
 					"</div>",
 				get_results: (keywords, callback) => {
 					var results = frappe.search.utils.get_nav_results(keywords);
 					frappe.tags.utils.get_tag_results(keywords).then(
-						global_results => {
+						(global_results) => {
 							results = results.concat(global_results);
 							callback(results, keywords);
 						},
-						err => {
+						(err) => {
 							// eslint-disable-next-line no-console
 							console.error(err);
 						}
 					);
-				}
-			}
+				},
+			},
 		};
 	}
 
@@ -97,15 +97,9 @@ frappe.search.SearchDialog = class {
 		this.$wrapper.find(".loading-state").addClass("hide");
 		this.$body.append($r);
 		if (this.$body.find(".search-results").length > 1) {
-			this.$body
-				.find(".search-results")
-				.first()
-				.addClass("hide");
+			this.$body.find(".search-results").first().addClass("hide");
 			$r.removeClass("hide");
-			this.$body
-				.find(".search-results")
-				.first()
-				.remove();
+			this.$body.find(".search-results").first().remove();
 		} else {
 			$r.removeClass("hide");
 		}
@@ -127,7 +121,7 @@ frappe.search.SearchDialog = class {
 	}
 
 	bind_input() {
-		this.$input.on("input", e => {
+		this.$input.on("input", (e) => {
 			const $el = $(e.currentTarget);
 			clearTimeout($el.data("timeout"));
 			$el.data(
@@ -148,7 +142,7 @@ frappe.search.SearchDialog = class {
 
 	bind_events() {
 		// Sidebar
-		this.$body.on("click", ".list-link", e => {
+		this.$body.on("click", ".list-link", (e) => {
 			const $link = $(e.currentTarget);
 			this.$body
 				.find(".search-sidebar")
@@ -160,14 +154,11 @@ frappe.search.SearchDialog = class {
 				.find(".results-area")
 				.empty()
 				.html(this.full_lists[type]);
-			this.$body
-				.find(".module-section-link")
-				.first()
-				.focus();
+			this.$body.find(".module-section-link").first().focus();
 		});
 
 		// Summary more links
-		this.$body.on("click", ".section-more", e => {
+		this.$body.on("click", ".section-more", (e) => {
 			const $section = $(e.currentTarget);
 			const type = $section.attr("data-category");
 			this.$body
@@ -185,7 +176,7 @@ frappe.search.SearchDialog = class {
 		});
 
 		// Full list more links
-		this.$body.on("click", ".list-more", e => {
+		this.$body.on("click", ".list-more", (e) => {
 			const $el = $(e.currentTarget);
 			const type = $el.attr("data-category");
 			const fetch_type = $el.attr("data-search");
@@ -199,11 +190,11 @@ frappe.search.SearchDialog = class {
 						type
 					)
 					.then(
-						doctype_results => {
+						(doctype_results) => {
 							doctype_results.length &&
 								this.add_more_results(doctype_results);
 						},
-						err => {
+						(err) => {
 							// eslint-disable-next-line no-console
 							console.error(err);
 						}
@@ -252,7 +243,7 @@ frappe.search.SearchDialog = class {
 	}
 
 	parse_results(result_sets, keyword) {
-		result_sets = result_sets.filter(function(set) {
+		result_sets = result_sets.filter(function (set) {
 			return set.results.length > 0;
 		});
 		if (result_sets.length > 0) {
@@ -273,12 +264,14 @@ frappe.search.SearchDialog = class {
 
 		this.modal_state = 0;
 		this.full_lists = {
-			"All Results": $('<div class="results-summary"></div>')
+			"All Results": $('<div class="results-summary"></div>'),
 		};
 		this.nav_lists = {};
 
-		result_sets.forEach(set => {
-			$sidebar.append($(__(sidebar_item_html, [set.title, __(set.title)])));
+		result_sets.forEach((set) => {
+			$sidebar.append(
+				$(__(sidebar_item_html, [set.title, __(set.title)]))
+			);
 			this.add_section_to_summary(set.title, set.results);
 			this.full_lists[set.title] = this.render_full_list(
 				set.title,
@@ -288,14 +281,13 @@ frappe.search.SearchDialog = class {
 		});
 
 		if (result_sets.length > 1) {
-			$sidebar.prepend($(__(sidebar_item_html, ['All Results', __('All Results')])));
+			$sidebar.prepend(
+				$(__(sidebar_item_html, ["All Results", __("All Results")]))
+			);
 		}
 
 		this.update($search_results.clone());
-		this.$body
-			.find(".list-link")
-			.first()
-			.trigger("click");
+		this.$body.find(".list-link").first().trigger("click");
 	}
 
 	render_full_list(type, results, fetch_type) {
@@ -303,13 +295,13 @@ frappe.search.SearchDialog = class {
 
 		let $results_list = $(`<div class="results-summary">
 			<div class="result-section full-list ${type}-section col-sm-12">
-				<div class="result-title"> ${ __(type) }</div>
+				<div class="result-title"> ${__(type)}</div>
 				<div class="result-body">
 				</div>
 			</div>
 		</div>`);
 
-		results.slice(0, max_length).forEach(result => {
+		results.slice(0, max_length).forEach((result) => {
 			$results_list
 				.find(".result-body")
 				.append(this.render_result(type, result));
@@ -331,7 +323,7 @@ frappe.search.SearchDialog = class {
 	add_section_to_summary(type, results) {
 		let section_length = 4;
 		let more_html = "";
-		let get_result_html = result => this.render_result(type, result);
+		let get_result_html = (result) => this.render_result(type, result);
 
 		if (results.length > section_length) {
 			more_html = `<div>
@@ -381,9 +373,7 @@ frappe.search.SearchDialog = class {
 		)} class="result-section-link">${result.label}</a>`;
 		let title_html = !result.description
 			? link_html
-			: `<b>${link_html}</b><div class="description"> ${
-				result.description
-			} </div>`;
+			: `<b>${link_html}</b><div class="description"> ${result.description} </div>`;
 
 		let result_text = `<div class="result-text">
 			${title_html}
@@ -424,7 +414,7 @@ frappe.search.SearchDialog = class {
 	add_more_results(results_set) {
 		let more_results = $('<div class="more-results last"></div>');
 		if (results_set[0].results) {
-			results_set[0].results.forEach(result => {
+			results_set[0].results.forEach((result) => {
 				more_results.append(
 					this.render_result(results_set[0].title, result)
 				);
@@ -443,6 +433,6 @@ frappe.search.SearchDialog = class {
 			);
 			this.$body.find(".more-results:last").append(no_of_results_cue);
 		}
-		this.$body.find(".more-results.last").slideDown(200, function() {});
+		this.$body.find(".more-results.last").slideDown(200, function () {});
 	}
 };

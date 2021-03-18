@@ -10,14 +10,14 @@ QUnit.test("test: Slack Webhook URL", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Slack Webhook URL
-		() => frappe.tests.make('Slack Webhook URL', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Slack Webhook URL", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

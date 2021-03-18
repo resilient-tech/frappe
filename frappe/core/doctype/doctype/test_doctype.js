@@ -10,14 +10,14 @@ QUnit.test("test: DocType", function (assert) {
 
 	frappe.run_serially([
 		// insert a new DocType
-		() => frappe.tests.make('DocType', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("DocType", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

@@ -15,8 +15,22 @@ Object.assign(window, {
 });
 
 $.extend(frappe.perm, {
-	rights: ["read", "write", "create", "delete", "submit", "cancel", "amend",
-		"report", "import", "export", "print", "email", "share", "set_user_permissions"],
+	rights: [
+		"read",
+		"write",
+		"create",
+		"delete",
+		"submit",
+		"cancel",
+		"amend",
+		"report",
+		"import",
+		"export",
+		"print",
+		"email",
+		"share",
+		"set_user_permissions",
+	],
 
 	doctype_perm: {},
 
@@ -34,8 +48,7 @@ $.extend(frappe.perm, {
 
 		if (permlevel === 0 && perm && doc) {
 			let docinfo = frappe.model.get_docinfo(doctype, doc.name);
-			if (docinfo && !docinfo.permissions[ptype])
-				perm = false;
+			if (docinfo && !docinfo.permissions[ptype]) perm = false;
 		}
 
 		return perm;
@@ -45,9 +58,12 @@ $.extend(frappe.perm, {
 		let perm = [{ read: 0, permlevel: 0 }];
 
 		let meta = frappe.get_doc("DocType", doctype);
-		const user  = frappe.session.user;
+		const user = frappe.session.user;
 
-		if (user === "Administrator" || frappe.user_roles.includes("Administrator")) {
+		if (
+			user === "Administrator" ||
+			frappe.user_roles.includes("Administrator")
+		) {
 			perm[0].read = 1;
 		}
 
@@ -90,13 +106,20 @@ $.extend(frappe.perm, {
 						if (s.read) {
 							// also give print, email permissions if read
 							// and these permissions exist at level [0]
-							perm[0].email = frappe.boot.user.can_email.indexOf(doctype) !== -1 ? 1 : 0;
-							perm[0].print = frappe.boot.user.can_print.indexOf(doctype) !== -1 ? 1 : 0;
+							perm[0].email =
+								frappe.boot.user.can_email.indexOf(doctype) !==
+								-1
+									? 1
+									: 0;
+							perm[0].print =
+								frappe.boot.user.can_print.indexOf(doctype) !==
+								-1
+									? 1
+									: 0;
 						}
 					}
 				}
 			}
-
 		}
 
 		if (frappe.model.can_read(doctype) && !perm[0].read) {
@@ -110,7 +133,7 @@ $.extend(frappe.perm, {
 	get_role_permissions: (meta) => {
 		let perm = [{ read: 0, permlevel: 0 }];
 		// Returns a `dict` of evaluated Role Permissions
-		(meta.permissions || []).forEach(p => {
+		(meta.permissions || []).forEach((p) => {
 			// if user has this role
 			let permlevel = cint(p.permlevel);
 			if (!perm[permlevel]) {
@@ -119,8 +142,8 @@ $.extend(frappe.perm, {
 			}
 
 			if (frappe.user_roles.includes(p.role)) {
-				frappe.perm.rights.forEach(right => {
-					let value = perm[permlevel][right] || (p[right] || 0);
+				frappe.perm.rights.forEach((right) => {
+					let value = perm[permlevel][right] || p[right] || 0;
 					if (value) {
 						perm[permlevel][right] = value;
 					}
@@ -129,7 +152,7 @@ $.extend(frappe.perm, {
 		});
 
 		// fill gaps with empty object
-		perm = perm.map(p => p || {});
+		perm = perm.map((p) => p || {});
 		return perm;
 	},
 
@@ -144,10 +167,16 @@ $.extend(frappe.perm, {
 
 		if (user_permissions && !$.isEmptyObject(user_permissions)) {
 			let rules = {};
-			let fields_to_check = frappe.meta.get_fields_to_check_permissions(doctype);
+			let fields_to_check = frappe.meta.get_fields_to_check_permissions(
+				doctype
+			);
 			$.each(fields_to_check, (i, df) => {
-				const user_permissions_for_doctype = user_permissions[df.options] || [];
-				const allowed_records = frappe.perm.get_allowed_docs_for_doctype(user_permissions_for_doctype, doctype);
+				const user_permissions_for_doctype =
+					user_permissions[df.options] || [];
+				const allowed_records = frappe.perm.get_allowed_docs_for_doctype(
+					user_permissions_for_doctype,
+					doctype
+				);
 				if (allowed_records.length) {
 					rules[df.label] = allowed_records;
 				}
@@ -158,7 +187,7 @@ $.extend(frappe.perm, {
 		}
 
 		if (perm[0].if_owner && perm[0].read) {
-			match_rules.push({ "Owner": frappe.session.user });
+			match_rules.push({ Owner: frappe.session.user });
 		}
 		return match_rules;
 	},
@@ -171,7 +200,9 @@ $.extend(frappe.perm, {
 		}
 
 		if (!perm) {
-			return (df && (cint(df.hidden) || cint(df.hidden_due_to_dependency))) ? "None" : "Write";
+			return df && (cint(df.hidden) || cint(df.hidden_due_to_dependency))
+				? "None"
+				: "Write";
 		}
 
 		if (!df.permlevel) df.permlevel = 0;
@@ -207,7 +238,12 @@ $.extend(frappe.perm, {
 		// allow on submit
 		// let allow_on_submit = df.fieldtype==="Table" ? 0 : cint(df.allow_on_submit);
 		let allow_on_submit = cint(df.allow_on_submit);
-		if (status === "Read" && allow_on_submit && cint(doc.docstatus) === 1 && p.write) {
+		if (
+			status === "Read" &&
+			allow_on_submit &&
+			cint(doc.docstatus) === 1 &&
+			p.write
+		) {
 			status = "Write";
 		}
 		if (explain) console.log("By Allow on Submit:" + status);
@@ -215,9 +251,11 @@ $.extend(frappe.perm, {
 		// workflow state
 		if (status === "Read" && cur_frm && cur_frm.state_fieldname) {
 			// fields updated by workflow must be read-only
-			if (cint(cur_frm.read_only) ||
+			if (
+				cint(cur_frm.read_only) ||
 				in_list(cur_frm.states.update_fields, df.fieldname) ||
-				df.fieldname == cur_frm.state_fieldname) {
+				df.fieldname == cur_frm.state_fieldname
+			) {
 				status = "Read";
 			}
 		}
@@ -238,9 +276,13 @@ $.extend(frappe.perm, {
 	},
 
 	is_visible: (df, doc, perm) => {
-		if (typeof df === 'string') {
+		if (typeof df === "string") {
 			// df is fieldname
-			df = frappe.meta.get_docfield(doc.doctype, df, doc.parent || doc.name);
+			df = frappe.meta.get_docfield(
+				doc.doctype,
+				df,
+				doc.parent || doc.name
+			);
 		}
 
 		let status = frappe.perm.get_field_display_status(df, doc, perm);
@@ -250,29 +292,40 @@ $.extend(frappe.perm, {
 
 	get_allowed_docs_for_doctype: (user_permissions, doctype) => {
 		// returns docs from the list of user permissions that are allowed under provided doctype
-		return frappe.perm.filter_allowed_docs_for_doctype(user_permissions, doctype, false);
+		return frappe.perm.filter_allowed_docs_for_doctype(
+			user_permissions,
+			doctype,
+			false
+		);
 	},
 
-	filter_allowed_docs_for_doctype: (user_permissions, doctype, with_default_doc=true) => {
+	filter_allowed_docs_for_doctype: (
+		user_permissions,
+		doctype,
+		with_default_doc = true
+	) => {
 		// returns docs from the list of user permissions that are allowed under provided doctype
 		// also returns default doc when with_default_doc is set
-		const filtered_perms = (user_permissions || []).filter(perm => {
-			return (perm.applicable_for === doctype || !perm.applicable_for);
+		const filtered_perms = (user_permissions || []).filter((perm) => {
+			return perm.applicable_for === doctype || !perm.applicable_for;
 		});
 
-		const allowed_docs = (filtered_perms).map(perm => perm.doc);
+		const allowed_docs = filtered_perms.map((perm) => perm.doc);
 
 		if (with_default_doc) {
-			const default_doc = allowed_docs.length === 1 ? allowed_docs : filtered_perms
-				.filter(perm => perm.is_default)
-				.map(record => record.doc);
+			const default_doc =
+				allowed_docs.length === 1
+					? allowed_docs
+					: filtered_perms
+							.filter((perm) => perm.is_default)
+							.map((record) => record.doc);
 
 			return {
 				allowed_records: allowed_docs,
-				default_doc: default_doc[0]
+				default_doc: default_doc[0],
 			};
 		} else {
 			return allowed_docs;
 		}
-	}
+	},
 });

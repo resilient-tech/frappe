@@ -10,14 +10,14 @@ QUnit.test("test: Data Migration Plan", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Data Migration Plan
-		() => frappe.tests.make('Data Migration Plan', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Data Migration Plan", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

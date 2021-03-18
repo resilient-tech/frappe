@@ -4,7 +4,7 @@ frappe.provide("frappe.utils");
 
 export default class LinksWidget extends Widget {
 	constructor(opts) {
-		opts.icon = opts.icon || 'file';
+		opts.icon = opts.icon || "file";
 		super(opts);
 	}
 
@@ -21,14 +21,14 @@ export default class LinksWidget extends Widget {
 		this.options = {};
 		this.options.links = this.links;
 		this.widget.addClass("links-widget-box");
-		const is_link_disabled = item => {
+		const is_link_disabled = (item) => {
 			return item.dependencies && item.incomplete_dependencies;
 		};
-		const disabled_dependent = item => {
+		const disabled_dependent = (item) => {
 			return is_link_disabled(item) ? "disabled-link" : "";
 		};
 
-		const get_indicator_color = item => {
+		const get_indicator_color = (item) => {
 			if (item.open_count) {
 				return "red";
 			}
@@ -38,7 +38,7 @@ export default class LinksWidget extends Widget {
 			return "gray";
 		};
 
-		const get_link_for_item = item => {
+		const get_link_for_item = (item) => {
 			if (is_link_disabled(item)) {
 				return `<span class="link-content ellipsis disabled-link">${
 					item.label ? item.label : item.name
@@ -54,17 +54,21 @@ export default class LinksWidget extends Widget {
 			}
 
 			if (item.youtube_id)
-				return `<span class="link-content help-video-link ellipsis" data-youtubeid="${item.youtube_id}">
+				return `<span class="link-content help-video-link ellipsis" data-youtubeid="${
+					item.youtube_id
+				}">
 						${item.label ? item.label : item.name}</span>`;
 
-			return `<span class="link-content ellipsis">${item.label ? item.label : item.name}</span>`;
+			return `<span class="link-content ellipsis">${
+				item.label ? item.label : item.name
+			}</span>`;
 		};
 
-		this.link_list = this.links.map(item => {
+		this.link_list = this.links.map((item) => {
 			const route = frappe.utils.generate_route({
 				name: item.link_to,
 				type: item.link_type,
-				is_query_report: item.is_query_report
+				is_query_report: item.is_query_report,
 			});
 
 			return $(`<a href="${route}" class="link-item ellipsis ${
@@ -75,11 +79,11 @@ export default class LinksWidget extends Widget {
 			</a>`);
 		});
 
-		this.link_list.forEach(link => link.appendTo(this.body));
+		this.link_list.forEach((link) => link.appendTo(this.body));
 	}
 
 	setup_events() {
-		this.link_list.forEach(link => {
+		this.link_list.forEach((link) => {
 			// Bind Popver Event
 			const link_label = link.find(".link-content");
 
@@ -92,7 +96,7 @@ export default class LinksWidget extends Widget {
 				});
 				link_label.mouseout(() => popover.hide());
 			} else {
-				link_label.click(event => {
+				link_label.click((event) => {
 					if (this.in_customize_mode) return;
 
 					if (link_label.hasClass("help-video-link")) {

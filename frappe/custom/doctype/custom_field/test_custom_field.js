@@ -10,14 +10,14 @@ QUnit.test("test: Custom Field", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Custom Field
-		() => frappe.tests.make('Custom Field', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Custom Field", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

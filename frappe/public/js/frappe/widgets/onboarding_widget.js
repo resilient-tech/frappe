@@ -4,7 +4,9 @@ frappe.provide("frappe.utils");
 
 export default class OnboardingWidget extends Widget {
 	make_body() {
-		this.steps_wrapper = $(`<div class="onboarding-steps-wrapper"></div>`).appendTo(this.body);
+		this.steps_wrapper = $(
+			`<div class="onboarding-steps-wrapper"></div>`
+		).appendTo(this.body);
 		this.step_preview = $(`<div class="onboarding-step-preview">
 			<div class="onboarding-step-body"></div>
 			<div class="onboarding-step-footer"></div>
@@ -21,7 +23,7 @@ export default class OnboardingWidget extends Widget {
 	}
 
 	add_step(step, index) {
-		let status = 'pending';
+		let status = "pending";
 
 		if (step.is_skipped) status = "skipped";
 		if (step.is_complete) status = "complete";
@@ -29,8 +31,8 @@ export default class OnboardingWidget extends Widget {
 		let $step = $(`<a class="onboarding-step ${status}">
 				<div class="step-title">
 					<div class="step-index step-pending">${__(index + 1)}</div>
-					<div class="step-index step-skipped">${frappe.utils.icon('tick', 'xs')}</div>
-					<div class="step-index step-complete">${frappe.utils.icon('tick', 'xs')}</div>
+					<div class="step-index step-skipped">${frappe.utils.icon("tick", "xs")}</div>
+					<div class="step-index step-complete">${frappe.utils.icon("tick", "xs")}</div>
 					<div>${__(step.title)}</div>
 				</div>
 			</a>`);
@@ -39,9 +41,7 @@ export default class OnboardingWidget extends Widget {
 
 		// Add skip button
 		if (!step.is_complete && !step.is_skipped) {
-			let skip_html = $(
-				`<div class="step-skip">${__('Skip')}</div>`
-			);
+			let skip_html = $(`<div class="step-skip">${__("Skip")}</div>`);
 
 			skip_html.appendTo($step);
 			skip_html.on("click", () => {
@@ -85,19 +85,27 @@ export default class OnboardingWidget extends Widget {
 			this.step_footer.empty();
 
 			this.step_body.html(
-				step.description ?
-					frappe.markdown(step.description)
+				step.description
+					? frappe.markdown(step.description)
 					: `<h1>${step.title}</h1>`
 			);
 
 			if (step.intro_video_url) {
-				$(`<button class="btn btn-primary btn-sm">${__('Watch Tutorial')}</button>`)
+				$(
+					`<button class="btn btn-primary btn-sm">${__(
+						"Watch Tutorial"
+					)}</button>`
+				)
 					.appendTo(this.step_footer)
-					.on('click', toggle_video);
+					.on("click", toggle_video);
 			} else {
-				$(`<button class="btn btn-primary btn-sm">${__(step.action_label || step.action)}</button>`)
+				$(
+					`<button class="btn btn-primary btn-sm">${__(
+						step.action_label || step.action
+					)}</button>`
+				)
 					.appendTo(this.step_footer)
-					.on('click', () => actions[step.action](step));
+					.on("click", () => actions[step.action](step));
 			}
 		};
 
@@ -105,28 +113,38 @@ export default class OnboardingWidget extends Widget {
 			this.step_body.empty();
 			this.step_footer.empty();
 
-			const video = $(`<div class="video-player" data-plyr-provider="youtube" data-plyr-embed-id="${step.intro_video_url}"></div>`);
+			const video = $(
+				`<div class="video-player" data-plyr-provider="youtube" data-plyr-embed-id="${step.intro_video_url}"></div>`
+			);
 			video.appendTo(this.step_body);
 			let plyr = new frappe.Plyr(video[0], {
 				hideControls: true,
 				resetOnEnd: true,
 			});
 
-			$(`<button class="btn btn-primary btn-sm">${__(step.action_label || step.action)}</button>`)
+			$(
+				`<button class="btn btn-primary btn-sm">${__(
+					step.action_label || step.action
+				)}</button>`
+			)
 				.appendTo(this.step_footer)
-				.on('click', () => {
+				.on("click", () => {
 					plyr.pause();
 					actions[step.action](step);
 				});
 
 			// Fire only once, on hashchange
-			$(window).one('hashchange', () => {
+			$(window).one("hashchange", () => {
 				plyr.pause();
 			});
 
-			$(`<button class="btn btn-secondary ml-2 btn-sm">${__('Back')}</button>`)
+			$(
+				`<button class="btn btn-secondary ml-2 btn-sm">${__(
+					"Back"
+				)}</button>`
+			)
 				.appendTo(this.step_footer)
-				.on('click', toggle_content);
+				.on("click", toggle_content);
 		};
 
 		toggle_content();
@@ -136,7 +154,11 @@ export default class OnboardingWidget extends Widget {
 	go_to_page(step) {
 		this.mark_complete(step);
 		frappe.set_route(step.path).then(() => {
-			let message = step.callback_message || __("You can continue with the onboarding after exploring this page");
+			let message =
+				step.callback_message ||
+				__(
+					"You can continue with the onboarding after exploring this page"
+				);
 			let title = step.callback_title || __("Awesome Work");
 
 			let msg_dialog = frappe.msgprint({
@@ -302,7 +324,9 @@ export default class OnboardingWidget extends Widget {
 
 		let callback = () => {
 			frappe.msgprint({
-				message: __("You're doing great, let's take you back to the onboarding page."),
+				message: __(
+					"You're doing great, let's take you back to the onboarding page."
+				),
 				title: __("Good Work 🎉"),
 				primary_action: {
 					action: () => {
@@ -323,7 +347,7 @@ export default class OnboardingWidget extends Widget {
 			frappe.route_hooks.after_save = () => {
 				frappe.msgprint({
 					message: __("Submit this document to complete this step."),
-					title: __("Great")
+					title: __("Great"),
 				});
 			};
 			frappe.route_hooks.after_submit = callback;
@@ -331,7 +355,7 @@ export default class OnboardingWidget extends Widget {
 			frappe.route_hooks.after_save = callback;
 		}
 
-		frappe.set_route('Form', step.reference_document, 'new');
+		frappe.set_route("Form", step.reference_document, "new");
 	}
 
 	show_quick_entry(step) {
@@ -362,7 +386,7 @@ export default class OnboardingWidget extends Widget {
 				} else {
 					frappe.msgprint({
 						message: __("Let us continue with the onboarding"),
-						title: __("Looks Great")
+						title: __("Looks Great"),
 					});
 					this.mark_complete(step);
 				}
@@ -453,11 +477,11 @@ export default class OnboardingWidget extends Widget {
 					<img src="${success_state_image}" alt="Success State" class="zoom-in success-state">
 					<h3>${success_message}</h3>
 					<div class="text-muted">${documentation}</div>
-					<button class="btn btn-primary btn-sm">${__('Continue')}</button>
+					<button class="btn btn-primary btn-sm">${__("Continue")}</button>
 			</div>
 		`);
 
-		success.find('.btn').on('click', () => this.delete());
+		success.find(".btn").on("click", () => this.delete());
 
 		this.step_preview.empty();
 		success.appendTo(this.step_preview);
@@ -488,7 +512,11 @@ export default class OnboardingWidget extends Widget {
 	set_actions() {
 		this.action_area.empty();
 		const dismiss = $(
-			`<div class="small" style="cursor:pointer;">${__('Dismiss', null, 'Stop showing the onboarding widget.')}</div>`
+			`<div class="small" style="cursor:pointer;">${__(
+				"Dismiss",
+				null,
+				"Stop showing the onboarding widget."
+			)}</div>`
 		);
 		dismiss.on("click", () => {
 			let dismissed = JSON.parse(

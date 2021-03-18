@@ -2,7 +2,7 @@ frappe.ui.form.FormViewers = class FormViewers {
 	constructor({ frm, parent }) {
 		this.frm = frm;
 		this.parent = parent;
-		this.parent.tooltip({ title: __('Currently Viewing') });
+		this.parent.tooltip({ title: __("Currently Viewing") });
 	}
 
 	refresh() {
@@ -14,19 +14,19 @@ frappe.ui.form.FormViewers = class FormViewers {
 	}
 };
 
-frappe.ui.form.FormViewers.set_users = function(data, type) {
+frappe.ui.form.FormViewers.set_users = function (data, type) {
 	const doctype = data.doctype;
 	const docname = data.docname;
 	const docinfo = frappe.model.get_docinfo(doctype, docname);
 
 	const past_users = ((docinfo && docinfo[type]) || {}).past || [];
 	const users = data.users || [];
-	const new_users = users.filter(user => !past_users.includes(user));
+	const new_users = users.filter((user) => !past_users.includes(user));
 
 	frappe.model.set_docinfo(doctype, docname, type, {
 		past: past_users.concat(new_users),
 		new: new_users,
-		current: users
+		current: users,
 	});
 
 	if (

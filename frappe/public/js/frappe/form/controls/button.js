@@ -3,12 +3,12 @@ frappe.ui.form.ControlButton = frappe.ui.form.ControlData.extend({
 		// should be always true in case of button
 		return true;
 	},
-	make_input: function() {
+	make_input: function () {
 		var me = this;
-		const btn_type = this.df.primary ? 'btn-primary': 'btn-default';
+		const btn_type = this.df.primary ? "btn-primary" : "btn-default";
 		this.$input = $(`<button class="btn btn-xs ${btn_type}">`)
 			.prependTo(me.input_area)
-			.on("click", function() {
+			.on("click", function () {
 				me.onclick();
 			});
 		this.input = this.$input.get(0);
@@ -16,10 +16,19 @@ frappe.ui.form.ControlButton = frappe.ui.form.ControlData.extend({
 		this.has_input = true;
 		this.toggle_label(false);
 	},
-	onclick: function() {
+	onclick: function () {
 		if (this.frm && this.frm.doc) {
-			if (this.frm.script_manager.has_handlers(this.df.fieldname, this.doctype)) {
-				this.frm.script_manager.trigger(this.df.fieldname, this.doctype, this.docname);
+			if (
+				this.frm.script_manager.has_handlers(
+					this.df.fieldname,
+					this.doctype
+				)
+			) {
+				this.frm.script_manager.trigger(
+					this.df.fieldname,
+					this.doctype,
+					this.docname
+				);
 			} else {
 				if (this.df.options) {
 					this.run_server_script();
@@ -29,38 +38,40 @@ frappe.ui.form.ControlButton = frappe.ui.form.ControlData.extend({
 			this.df.click();
 		}
 	},
-	run_server_script: function() {
+	run_server_script: function () {
 		// DEPRECATE
 		var me = this;
-		if(this.frm && this.frm.docname) {
+		if (this.frm && this.frm.docname) {
 			frappe.call({
 				method: "runserverobj",
-				args: {'docs': this.frm.doc, 'method': this.df.options },
+				args: { docs: this.frm.doc, method: this.df.options },
 				btn: this.$input,
-				callback: function(r) {
-					if(!r.exc) {
+				callback: function (r) {
+					if (!r.exc) {
 						me.frm.refresh_fields();
 					}
-				}
+				},
 			});
 		}
 	},
 	hide() {
 		this.$input.hide();
 	},
-	set_input_areas: function() {
+	set_input_areas: function () {
 		this._super();
 		$(this.disp_area).removeClass().addClass("hide");
 	},
-	set_empty_description: function() {
+	set_empty_description: function () {
 		this.$wrapper.find(".help-box").empty().toggle(false);
 	},
-	set_label: function(label) {
+	set_label: function (label) {
 		if (label) {
 			this.df.label = label;
 		}
-		label = (this.df.icon ? frappe.utils.icon(this.df.icon) : "") + __(this.df.label);
+		label =
+			(this.df.icon ? frappe.utils.icon(this.df.icon) : "") +
+			__(this.df.label);
 		$(this.label_span).html("&nbsp;");
 		this.$input && this.$input.html(label);
-	}
+	},
 });

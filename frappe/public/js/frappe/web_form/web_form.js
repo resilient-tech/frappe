@@ -1,6 +1,6 @@
 frappe.provide("frappe.ui");
 frappe.provide("frappe.web_form");
-import EventEmitterMixin from '../../frappe/event_emitter';
+import EventEmitterMixin from "../../frappe/event_emitter";
 
 export default class WebForm extends frappe.ui.FieldGroup {
 	constructor(opts) {
@@ -20,7 +20,8 @@ export default class WebForm extends frappe.ui.FieldGroup {
 	make() {
 		super.make();
 		this.set_field_values();
-		if (this.introduction_text) this.set_form_description(this.introduction_text);
+		if (this.introduction_text)
+			this.set_form_description(this.introduction_text);
 		if (this.allow_print && !this.is_new) this.setup_print_button();
 		if (this.allow_delete && !this.is_new) this.setup_delete_button();
 		if (this.is_new) this.setup_cancel_button();
@@ -29,7 +30,7 @@ export default class WebForm extends frappe.ui.FieldGroup {
 
 		// webform client script
 		frappe.init_client_script && frappe.init_client_script();
-		frappe.web_form.events.trigger('after_load');
+		frappe.web_form.events.trigger("after_load");
 		this.after_load && this.after_load();
 	}
 
@@ -52,11 +53,11 @@ export default class WebForm extends frappe.ui.FieldGroup {
 	}
 
 	set_form_description(intro) {
-		let intro_wrapper = document.getElementById('introduction');
+		let intro_wrapper = document.getElementById("introduction");
 		intro_wrapper.innerHTML = intro;
 	}
 
-	add_button(name, type, action, wrapper_class=".web-form-actions") {
+	add_button(name, type, action, wrapper_class = ".web-form-actions") {
 		const button = document.createElement("button");
 		button.classList.add("btn", "btn-" + type, "btn-sm", "ml-2");
 		button.innerHTML = name;
@@ -65,11 +66,11 @@ export default class WebForm extends frappe.ui.FieldGroup {
 	}
 
 	add_button_to_footer(name, type, action) {
-		this.add_button(name, type, action, '.web-form-footer');
+		this.add_button(name, type, action, ".web-form-footer");
 	}
 
 	add_button_to_header(name, type, action) {
-		this.add_button(name, type, action, '.web-form-actions');
+		this.add_button(name, type, action, ".web-form-actions");
 	}
 
 	setup_primary_action() {
@@ -87,25 +88,24 @@ export default class WebForm extends frappe.ui.FieldGroup {
 	}
 
 	setup_delete_button() {
-		this.add_button_to_header(
-			frappe.utils.icon('delete'),
-			"danger",
-			() => this.delete()
+		this.add_button_to_header(frappe.utils.icon("delete"), "danger", () =>
+			this.delete()
 		);
 	}
 
 	setup_print_button() {
-		this.add_button_to_header(
-			frappe.utils.icon('print'),
-			"light",
-			() => this.print()
+		this.add_button_to_header(frappe.utils.icon("print"), "light", () =>
+			this.print()
 		);
 	}
 
 	save() {
 		let is_new = this.is_new;
 		if (this.validate && !this.validate()) {
-			frappe.throw(__("Couldn't save, please check the data you have entered"), __("Validation Error"));
+			frappe.throw(
+				__("Couldn't save, please check the data you have entered"),
+				__("Validation Error")
+			);
 		}
 
 		// validation hack: get_values will check for missing data
@@ -131,32 +131,32 @@ export default class WebForm extends frappe.ui.FieldGroup {
 				data: this.doc,
 				web_form: this.name,
 				docname: this.doc.name,
-				for_payment
+				for_payment,
 			},
-			callback: response => {
+			callback: (response) => {
 				// Check for any exception in response
 				if (!response.exc) {
 					// Success
 					this.handle_success(response.message);
-					frappe.web_form.events.trigger('after_save');
+					frappe.web_form.events.trigger("after_save");
 					this.after_save && this.after_save();
 					// args doctype and docname added to link doctype in file manager
 					if (is_new) {
 						frappe.call({
-							type: 'POST',
+							type: "POST",
 							method: "frappe.handler.upload_file",
 							args: {
 								file_url: response.message.attachment,
 								doctype: response.message.doctype,
-								docname: response.message.name
-							}
+								docname: response.message.name,
+							},
 						});
 					}
 				}
 			},
-			always: function() {
+			always: function () {
 				window.saving = false;
-			}
+			},
 		});
 		return true;
 	}
@@ -167,16 +167,19 @@ export default class WebForm extends frappe.ui.FieldGroup {
 			method: "frappe.website.doctype.web_form.web_form.delete",
 			args: {
 				web_form_name: this.name,
-				docname: this.doc.name
-			}
+				docname: this.doc.name,
+			},
 		});
 	}
 
 	print() {
-		window.open(`/printview?
+		window.open(
+			`/printview?
 			doctype=${this.doc_type}
 			&name=${this.doc.name}
-			&format=${this.print_format || "Standard"}`, '_blank');
+			&format=${this.print_format || "Standard"}`,
+			"_blank"
+		);
 	}
 
 	cancel() {
@@ -193,11 +196,11 @@ export default class WebForm extends frappe.ui.FieldGroup {
 			secondary_action: () => {
 				if (this.success_url) {
 					window.location.href = this.success_url;
-				} else if(this.login_required) {
+				} else if (this.login_required) {
 					window.location.href =
 						window.location.pathname + "?name=" + data.name;
 				}
-			}
+			},
 		});
 
 		success_dialog.show();

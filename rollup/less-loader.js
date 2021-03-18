@@ -1,8 +1,8 @@
-const pify = require('pify');
-const importCwd = require('import-cwd');
-const path = require('path');
+const pify = require("pify");
+const importCwd = require("import-cwd");
+const path = require("path");
 
-const getFileName = filepath => path.basename(filepath);
+const getFileName = (filepath) => path.basename(filepath);
 
 function loadModule(moduleId) {
 	// Trying to load module normally (relative to plugin directory)
@@ -17,24 +17,20 @@ function loadModule(moduleId) {
 }
 
 module.exports = {
-	name: 'less',
+	name: "less",
 	test: /\.less$/,
-	async process({
-		code
-	}) {
-		const less = loadModule('less');
+	async process({ code }) {
+		const less = loadModule("less");
 		if (!less) {
-			throw new Error('You need to install "less" packages in order to process Less files');
+			throw new Error(
+				'You need to install "less" packages in order to process Less files'
+			);
 		}
 
-		let {
-			css,
-			map,
-			imports
-		} = await pify(less.render.bind(less))(code, {
+		let { css, map, imports } = await pify(less.render.bind(less))(code, {
 			...this.options,
 			sourceMap: this.sourceMap && { outputSourceFiles: true },
-			filename: this.id
+			filename: this.id,
 		});
 
 		for (const dep of imports) {
@@ -43,12 +39,12 @@ module.exports = {
 
 		if (map) {
 			map = JSON.parse(map);
-			map.sources = map.sources.map(source => getFileName(source));
+			map.sources = map.sources.map((source) => getFileName(source));
 		}
 
 		return {
 			code: css,
-			map
+			map,
 		};
-	}
+	},
 };

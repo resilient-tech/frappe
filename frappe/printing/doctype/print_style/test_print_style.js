@@ -10,11 +10,11 @@ QUnit.test("test: Print Style", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Print Style
-		() => frappe.tests.make('Print Style', [
-			// values to be set
-			{print_style_name: 'Test Print Style'},
-			{css: '/* some css value */'}
-		]),
+		() =>
+			frappe.tests.make("Print Style", [
+				// values to be set
+				{ print_style_name: "Test Print Style" },
+				{ css: "/* some css value */" },
+			]),
 	]);
-
 });

@@ -1,12 +1,12 @@
-import JsBarcode from 'jsbarcode';
+import JsBarcode from "jsbarcode";
 
 frappe.ui.form.ControlBarcode = frappe.ui.form.ControlData.extend({
 	make_wrapper() {
 		// Create the elements for barcode area
 		this._super();
 
-		this.default_svg = '<svg height=80></svg>';
-		let $input_wrapper = this.$wrapper.find('.control-input-wrapper');
+		this.default_svg = "<svg height=80></svg>";
+		let $input_wrapper = this.$wrapper.find(".control-input-wrapper");
 		this.barcode_area = $(
 			`<div class="barcode-wrapper">${this.default_svg}</div>`
 		);
@@ -16,21 +16,21 @@ frappe.ui.form.ControlBarcode = frappe.ui.form.ControlData.extend({
 	parse(value) {
 		// Parse raw value
 		if (value) {
-			if (value.startsWith('<svg')) {
+			if (value.startsWith("<svg")) {
 				return value;
 			}
 			return this.get_barcode_html(value);
 		}
-		return '';
+		return "";
 	},
 
 	set_formatted_input(value) {
 		// Set values to display
 		let svg = value;
-		let barcode_value = '';
+		let barcode_value = "";
 
-		if (value && value.startsWith('<svg')) {
-			barcode_value = $(svg).attr('data-barcode-value');
+		if (value && value.startsWith("<svg")) {
+			barcode_value = $(svg).attr("data-barcode-value");
 		}
 
 		if (!barcode_value && this.doc) {
@@ -45,10 +45,10 @@ frappe.ui.form.ControlBarcode = frappe.ui.form.ControlData.extend({
 	get_barcode_html(value) {
 		if (value) {
 			// Get svg
-			const svg = this.barcode_area.find('svg')[0];
+			const svg = this.barcode_area.find("svg")[0];
 			JsBarcode(svg, value, this.get_options(value));
-			$(svg).attr('data-barcode-value', value);
-			$(svg).attr('width', '100%');
+			$(svg).attr("data-barcode-value", value);
+			$(svg).attr("width", "100%");
 			return this.barcode_area.html();
 		}
 	},
@@ -65,8 +65,8 @@ frappe.ui.form.ControlBarcode = frappe.ui.form.ControlData.extend({
 
 		if (frappe.utils.is_json(this.df.options)) {
 			options = JSON.parse(this.df.options);
-			if (options.format && options.format === 'EAN') {
-				options.format = value.length == 8 ? 'EAN8' : 'EAN13';
+			if (options.format && options.format === "EAN") {
+				options.format = value.length == 8 ? "EAN8" : "EAN13";
 			}
 
 			if (options.valueField) {
@@ -75,5 +75,5 @@ frappe.ui.form.ControlBarcode = frappe.ui.form.ControlData.extend({
 			}
 		}
 		return options;
-	}
+	},
 });

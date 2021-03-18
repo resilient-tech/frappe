@@ -1,22 +1,24 @@
 .cell-title {
-	font-weight: bold;
+  font-weight: bold;
 }
 
 .cell-effort-driven {
-	text-align: center;
+  text-align: center;
 }
 
 .toggle {
-	height: 9px;
-	width: 9px;
-	display: inline-block;
-	visibility: visible;
+  height: 9px;
+  width: 9px;
+  display: inline-block;
+  visibility: visible;
 }
 
 .toggle.expand {
-	background: url("/assets/frappe/js/lib/slickgrid/images/expand.gif") no-repeat center center;
+  background: url("/assets/frappe/js/lib/slickgrid/images/expand.gif") no-repeat
+    center center;
 }
 
 .toggle.collapse {
-	background: url("/assets/frappe/js/lib/slickgrid/images/collapse.gif") no-repeat center center;
+  background: url("/assets/frappe/js/lib/slickgrid/images/collapse.gif")
+    no-repeat center center;
 }

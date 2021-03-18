@@ -10,14 +10,14 @@ QUnit.test("test: View Log", function (assert) {
 
 	frappe.run_serially([
 		// insert a new View Log
-		() => frappe.tests.make('View Log', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("View Log", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

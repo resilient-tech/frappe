@@ -10,14 +10,14 @@ QUnit.test("test: Transaction Log", function (assert) {
 
 	frappe.run_serially([
 		// insert a new Transaction Log
-		() => frappe.tests.make('Transaction Log', [
-			// values to be set
-			{key: 'value'}
-		]),
+		() =>
+			frappe.tests.make("Transaction Log", [
+				// values to be set
+				{ key: "value" },
+			]),
 		() => {
-			assert.equal(cur_frm.doc.key, 'value');
+			assert.equal(cur_frm.doc.key, "value");
 		},
-		() => done()
+		() => done(),
 	]);
-
 });

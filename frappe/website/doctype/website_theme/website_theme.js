@@ -24,7 +24,7 @@ frappe.ui.form.on("Website Theme", {
 	set_default_theme_button_and_indicator(frm) {
 		frappe.db
 			.get_single_value("Website Settings", "website_theme")
-			.then(value => {
+			.then((value) => {
 				if (value === frm.doc.name) {
 					frm.page.set_indicator(__("Default Theme"), "green");
 				} else {
@@ -46,22 +46,24 @@ frappe.ui.form.on("Website Theme", {
 
 	make_app_theme_selector(frm) {
 		if (frm.app_theme_selector) {
-			frm.events.get_installed_apps(frm).then(apps => {
-				let ignored_apps = (frm.doc.ignored_apps || []).map(d => d.app);
+			frm.events.get_installed_apps(frm).then((apps) => {
+				let ignored_apps = (frm.doc.ignored_apps || []).map(
+					(d) => d.app
+				);
 				frm.app_theme_selector
 					.get_field("apps")
 					.select_options(
 						apps
-							.map(d => d.name)
-							.filter(app => !ignored_apps.includes(app))
+							.map((d) => d.name)
+							.filter((app) => !ignored_apps.includes(app))
 					);
 			});
 			return;
 		}
 		let $wrapper = frm.get_field("ignored_apps").$wrapper.hide();
 		let $body = $("<div>").insertAfter($wrapper);
-		let ignored_apps = (frm.doc.ignored_apps || []).map(d => d.app);
-		frm.events.get_installed_apps(frm).then(apps => {
+		let ignored_apps = (frm.doc.ignored_apps || []).map((d) => d.app);
+		frm.events.get_installed_apps(frm).then((apps) => {
 			let form = new frappe.ui.FieldGroup({
 				fields: [
 					{
@@ -73,40 +75,41 @@ frappe.ui.form.on("Website Theme", {
 							let value = form
 								.get_field("apps")
 								.get_unchecked_options()
-								.map(app => ({ app: app }));
-							frm.set_value("ignored_apps", value.length ? value : null);
+								.map((app) => ({ app: app }));
+							frm.set_value(
+								"ignored_apps",
+								value.length ? value : null
+							);
 						},
-						options: apps.map(app => ({
+						options: apps.map((app) => ({
 							label: app.title,
 							value: app.name,
-							checked: !ignored_apps.includes(app.name)
-						}))
-					}
+							checked: !ignored_apps.includes(app.name),
+						})),
+					},
 				],
-				body: $body
+				body: $body,
 			});
 			form.make();
 			frm.app_theme_selector = form;
-			$(form.wrapper)
-				.find(".form-section")
-				.css({
-					padding: 0,
-					marginLeft: "-15px",
-					marginRight: "-15px"
-				});
+			$(form.wrapper).find(".form-section").css({
+				padding: 0,
+				marginLeft: "-15px",
+				marginRight: "-15px",
+			});
 		});
 	},
 
 	get_installed_apps(frm) {
-		return new Promise(resolve => {
+		return new Promise((resolve) => {
 			if (frm.installed_apps) {
 				resolve(frm.installed_apps);
 				return;
 			}
-			return frm.call("get_apps").then(r => {
+			return frm.call("get_apps").then((r) => {
 				frm.installed_apps = r.message;
 				resolve(r.message);
 			});
 		});
-	}
+	},
 });

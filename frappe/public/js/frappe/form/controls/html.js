@@ -1,13 +1,13 @@
 frappe.ui.form.ControlHTML = frappe.ui.form.Control.extend({
-	make: function() {
+	make: function () {
 		this._super();
 		this.disp_area = this.wrapper;
 	},
-	refresh_input: function() {
+	refresh_input: function () {
 		var content = this.get_content();
-		if(content) this.$wrapper.html(content);
+		if (content) this.$wrapper.html(content);
 	},
-	get_content: function() {
+	get_content: function () {
 		var content = this.df.options || "";
 		content = __(content);
 		try {
@@ -16,11 +16,11 @@ frappe.ui.form.ControlHTML = frappe.ui.form.Control.extend({
 			return content;
 		}
 	},
-	html: function(html) {
+	html: function (html) {
 		this.$wrapper.html(html || this.get_content());
 	},
-	set_value: function(html) {
-		if(html.appendTo) {
+	set_value: function (html) {
+		if (html.appendTo) {
 			// jquery object
 			html.appendTo(this.$wrapper.empty());
 		} else {
@@ -28,5 +28,5 @@ frappe.ui.form.ControlHTML = frappe.ui.form.Control.extend({
 			this.df.options = html;
 			this.html(html);
 		}
-	}
+	},
 });

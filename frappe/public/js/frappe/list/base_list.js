@@ -34,7 +34,8 @@ frappe.views.BaseList = class BaseList {
 
 	setup_defaults() {
 		this.page_name = frappe.get_route_str();
-		this.page_title = this.page_title || frappe.router.doctype_layout || __(this.doctype);
+		this.page_title =
+			this.page_title || frappe.router.doctype_layout || __(this.doctype);
 		this.meta = frappe.get_meta(this.doctype);
 		this.settings = frappe.listview_settings[this.doctype] || {};
 		this.user_settings = frappe.get_user_settings(this.doctype);
@@ -83,12 +84,8 @@ frappe.views.BaseList = class BaseList {
 		return this.meta.fields.filter((df) => {
 			return (
 				(frappe.model.is_value_type(df.fieldtype) &&
-					(df.in_list_view &&
-						frappe.perm.has_perm(
-							this.doctype,
-							df.permlevel,
-							"read"
-						))) ||
+					df.in_list_view &&
+					frappe.perm.has_perm(this.doctype, df.permlevel, "read")) ||
 				(df.fieldtype === "Currency" &&
 					df.options &&
 					!df.options.includes(":")) ||
@@ -153,10 +150,10 @@ frappe.views.BaseList = class BaseList {
 	setup_page() {
 		this.page = this.parent.page;
 		this.$page = $(this.parent);
-		!this.hide_card_layout && this.page.main.addClass('frappe-card');
+		!this.hide_card_layout && this.page.main.addClass("frappe-card");
 		this.page.page_form.removeClass("row").addClass("flex");
 		this.hide_page_form && this.page.page_form.hide();
-		this.hide_sidebar && this.$page.addClass('no-list-sidebar');
+		this.hide_sidebar && this.$page.addClass("no-list-sidebar");
 		this.setup_page_head();
 	}
 
@@ -173,25 +170,27 @@ frappe.views.BaseList = class BaseList {
 	setup_view_menu() {
 		// TODO: add all icons
 		const icon_map = {
-			'Image': 'image-view',
-			'List': 'list',
-			'Report': 'small-file',
-			'Calendar': 'calendar',
-			'Gantt': 'gantt',
-			'Kanban': 'kanban',
-			'Dashboard': 'dashboard'
+			Image: "image-view",
+			List: "list",
+			Report: "small-file",
+			Calendar: "calendar",
+			Gantt: "gantt",
+			Kanban: "kanban",
+			Dashboard: "dashboard",
 		};
 
 		if (frappe.boot.desk_settings.view_switcher) {
-			this.views_menu = this.page.add_custom_button_group(__('{0} View', [this.view_name]),
-				icon_map[this.view_name] || 'list');
+			this.views_menu = this.page.add_custom_button_group(
+				__("{0} View", [this.view_name]),
+				icon_map[this.view_name] || "list"
+			);
 			this.views_list = new frappe.views.ListViewSelect({
 				doctype: this.doctype,
 				parent: this.views_menu,
 				page: this.page,
 				list_view: this,
 				sidebar: this.list_sidebar,
-				icon_map: icon_map
+				icon_map: icon_map,
 			});
 		}
 	}
@@ -218,20 +217,21 @@ frappe.views.BaseList = class BaseList {
 	set_menu_items() {
 		this.set_default_secondary_action();
 
-		this.menu_items && this.menu_items.map((item) => {
-			if (item.condition && item.condition() === false) {
-				return;
-			}
-			const $item = this.page.add_menu_item(
-				item.label,
-				item.action,
-				item.standard,
-				item.shortcut
-			);
-			if (item.class) {
-				$item && $item.addClass(item.class);
-			}
-		});
+		this.menu_items &&
+			this.menu_items.map((item) => {
+				if (item.condition && item.condition() === false) {
+					return;
+				}
+				const $item = this.page.add_menu_item(
+					item.label,
+					item.action,
+					item.standard,
+					item.shortcut
+				);
+				if (item.class) {
+					$item && $item.addClass(item.class);
+				}
+			});
 	}
 
 	set_breadcrumbs() {
@@ -239,7 +239,8 @@ frappe.views.BaseList = class BaseList {
 	}
 
 	setup_side_bar() {
-		if (this.hide_sidebar || !frappe.boot.desk_settings.list_sidebar) return;
+		if (this.hide_sidebar || !frappe.boot.desk_settings.list_sidebar)
+			return;
 		this.list_sidebar = new frappe.views.ListSidebar({
 			doctype: this.doctype,
 			stats: this.stats,
@@ -251,7 +252,8 @@ frappe.views.BaseList = class BaseList {
 	}
 
 	toggle_side_bar(show) {
-		let show_sidebar = show || JSON.parse(localStorage.show_sidebar || "true");
+		let show_sidebar =
+			show || JSON.parse(localStorage.show_sidebar || "true");
 		show_sidebar = !show_sidebar;
 		localStorage.show_sidebar = show_sidebar;
 		this.show_or_hide_sidebar();
@@ -337,12 +339,16 @@ frappe.views.BaseList = class BaseList {
 			`<div class="list-paging-area level">
 				<div class="level-left">
 					<div class="btn-group">
-						${paging_values.map((value) => `
+						${paging_values
+							.map(
+								(value) => `
 							<button type="button" class="btn btn-default btn-sm btn-paging"
 								data-value="${value}">
 								${value}
 							</button>
-						`).join("")}
+						`
+							)
+							.join("")}
 					</div>
 				</div>
 				<div class="level-right">
@@ -389,12 +395,16 @@ frappe.views.BaseList = class BaseList {
 	}
 
 	get_filter_value(fieldname) {
-		const filter = this.get_filters_for_args().filter(f => f[1] == fieldname)[0];
+		const filter = this.get_filters_for_args().filter(
+			(f) => f[1] == fieldname
+		)[0];
 		if (!filter) return;
-		return {
-			'like': filter[3].replace(/^%?|%$/g, ''),
-			'not set': null
-		}[filter[2]] || filter[3];
+		return (
+			{
+				like: filter[3].replace(/^%?|%$/g, ""),
+				"not set": null,
+			}[filter[2]] || filter[3]
+		);
 	}
 
 	get_filters_for_args() {
@@ -508,15 +518,17 @@ frappe.views.BaseList = class BaseList {
 class FilterArea {
 	constructor(list_view) {
 		this.list_view = list_view;
-		this.list_view.page.page_form.append(`<div class="standard-filter-section flex"></div>`);
+		this.list_view.page.page_form.append(
+			`<div class="standard-filter-section flex"></div>`
+		);
 
 		const filter_area = this.list_view.hide_page_form
 			? this.list_view.page.custom_actions
 			: this.list_view.page.page_form;
 
-		this.list_view.$filter_section = $('<div class="filter-section flex">').appendTo(
-			filter_area
-		);
+		this.list_view.$filter_section = $(
+			'<div class="filter-section flex">'
+		).appendTo(filter_area);
 
 		this.$filter_list_wrapper = this.list_view.$filter_section;
 		this.trigger_refresh = true;
@@ -636,7 +648,7 @@ class FilterArea {
 	}
 
 	remove_filters(filters) {
-		filters.map(f => {
+		filters.map((f) => {
 			this.remove(f[1]);
 		});
 	}
@@ -673,7 +685,9 @@ class FilterArea {
 	}
 
 	make_standard_filters() {
-		this.standard_filters_wrapper = this.list_view.page.page_form.find('.standard-filter-section');
+		this.standard_filters_wrapper = this.list_view.page.page_form.find(
+			".standard-filter-section"
+		);
 		let fields = [
 			{
 				fieldtype: "Data",
@@ -749,7 +763,7 @@ class FilterArea {
 				})
 		);
 
-		fields.map(df => {
+		fields.map((df) => {
 			this.list_view.page.add_field(df, this.standard_filters_wrapper);
 		});
 	}
@@ -780,16 +794,15 @@ class FilterArea {
 		$(`<div class="filter-selector">
 			<button class="btn btn-default btn-sm filter-button">
 				<span class="filter-icon">
-					${frappe.utils.icon('filter')}
+					${frappe.utils.icon("filter")}
 				</span>
 				<span class="button-label hidden-xs">
 					${__("Filter")}
 				<span>
 			</button>
-		</div>`
-		).appendTo(this.$filter_list_wrapper);
+		</div>`).appendTo(this.$filter_list_wrapper);
 
-		this.filter_button = this.$filter_list_wrapper.find('.filter-button');
+		this.filter_button = this.$filter_list_wrapper.find(".filter-button");
 		this.filter_list = new frappe.ui.FilterGroup({
 			base_list: this.list_view,
 			parent: this.$filter_list_wrapper,

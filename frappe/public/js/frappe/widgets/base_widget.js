@@ -1,4 +1,4 @@
-import get_dialog_constructor from './widget_dialog.js';
+import get_dialog_constructor from "./widget_dialog.js";
 
 export default class Widget {
 	constructor(opts) {
@@ -16,7 +16,7 @@ export default class Widget {
 	get_config() {
 		return {
 			name: this.name,
-			label: this.label
+			label: this.label,
 		};
 	}
 
@@ -26,17 +26,17 @@ export default class Widget {
 
 		options.allow_sorting &&
 			this.add_custom_button(
-				frappe.utils.icon('drag', 'xs'),
+				frappe.utils.icon("drag", "xs"),
 				null,
-				"drag-handle",
+				"drag-handle"
 			);
 
 		options.allow_delete &&
 			this.add_custom_button(
-				frappe.utils.icon('delete', 'xs'),
+				frappe.utils.icon("delete", "xs"),
 				() => this.delete(),
 				"",
-				`${__('Delete')}`
+				`${__("Delete")}`
 			);
 
 		if (options.allow_hiding) {
@@ -46,8 +46,8 @@ export default class Widget {
 				this.title_field.css("opacity", 0.5);
 				this.footer.css("opacity", 0.5);
 			}
-			const classname = this.hidden ? 'fa fa-eye' : 'fa fa-eye-slash';
-			const title = this.hidden ? `${__('Show')}` : `${__('Hide')}`;
+			const classname = this.hidden ? "fa fa-eye" : "fa fa-eye-slash";
+			const title = this.hidden ? `${__("Show")}` : `${__("Hide")}`;
 			this.add_custom_button(
 				`<i class="${classname}" aria-hidden="true"></i>`,
 				() => this.hide_or_show(),
@@ -61,13 +61,13 @@ export default class Widget {
 		}
 
 		options.allow_edit &&
-			this.add_custom_button(
-				frappe.utils.icon("edit", "xs"),
-				() => this.edit()
+			this.add_custom_button(frappe.utils.icon("edit", "xs"), () =>
+				this.edit()
 			);
 
 		if (options.allow_resize) {
-			const title = this.width == 'Full'? `${__('Collapse')}` : `${__('Expand')}`;
+			const title =
+				this.width == "Full" ? `${__("Collapse")}` : `${__("Expand")}`;
 			this.add_custom_button(
 				'<i class="fa fa-expand" aria-hidden="true"></i>',
 				() => this.toggle_width(),
@@ -75,9 +75,7 @@ export default class Widget {
 				title
 			);
 
-			this.resize_button = this.action_area.find(
-				".resize-button"
-			);
+			this.resize_button = this.action_area.find(".resize-button");
 		}
 	}
 
@@ -88,9 +86,9 @@ export default class Widget {
 
 	make_widget() {
 		this.widget = $(`<div class="widget
-			${ this.hidden ? "hidden" : " " }
-			${ this.shadow ? "widget-shadow" : " " }
-		" data-widget-name="${this.name ? this.name : ''}">
+			${this.hidden ? "hidden" : " "}
+			${this.shadow ? "widget-shadow" : " "}
+		" data-widget-name="${this.name ? this.name : ""}">
 			<div class="widget-head">
 				<div>
 					<div class="widget-title ellipsis"></div>
@@ -123,28 +121,29 @@ export default class Widget {
 		} else {
 			this.title_field[0].innerHTML = title;
 			if (max_chars) {
-				this.title_field[0].setAttribute('title', this.label);
+				this.title_field[0].setAttribute("title", this.label);
 			}
 		}
 		this.subtitle && this.subtitle_field.html(this.subtitle);
 	}
 
-	add_custom_button(html, action, class_name = "", title="", btn_type) {
-		if (!btn_type) btn_type = 'btn-secondary';
+	add_custom_button(html, action, class_name = "", title = "", btn_type) {
+		if (!btn_type) btn_type = "btn-secondary";
 		let button = $(
 			`<button class="btn ${btn_type} btn-xs ${class_name}" title="${title}">${html}</button>`
 		);
-		button.click(event => {
+		button.click((event) => {
 			event.stopPropagation();
 			action && action();
 		});
 		button.appendTo(this.action_area);
 	}
 
-	delete(animate=true) {
+	delete(animate = true) {
 		let remove_widget = (setup_new) => {
 			this.widget.remove();
-			this.options.on_delete && this.options.on_delete(this.name, setup_new);
+			this.options.on_delete &&
+				this.options.on_delete(this.name, setup_new);
 		};
 
 		if (animate) {
@@ -171,25 +170,26 @@ export default class Widget {
 
 				this.refresh();
 			},
-			primary_action_label: __("Save")
+			primary_action_label: __("Save"),
 		});
 
 		this.edit_dialog.make();
 	}
 
 	toggle_width() {
-		if (this.width == 'Full') {
+		if (this.width == "Full") {
 			this.widget.removeClass("full-width");
 			this.width = null;
 			this.refresh();
 		} else {
 			this.widget.addClass("full-width");
-			this.width = 'Full';
+			this.width = "Full";
 			this.refresh();
 		}
 
-		const title = this.width == 'Full' ? `${__('Collapse')}` : `${__('Expand')}`;
-		this.resize_button.attr('title', title);
+		const title =
+			this.width == "Full" ? `${__("Collapse")}` : `${__("Expand")}`;
+		this.resize_button.attr("title", title);
 	}
 
 	hide_or_show() {
@@ -206,12 +206,12 @@ export default class Widget {
 		}
 		this.show_or_hide_button.empty();
 
-		const classname = this.hidden ? 'fa fa-eye' : 'fa fa-eye-slash';
-		const title = this.hidden ? `${__('Show')}` : `${__('Hide')}`;
+		const classname = this.hidden ? "fa fa-eye" : "fa fa-eye-slash";
+		const title = this.hidden ? `${__("Show")}` : `${__("Hide")}`;
 
-		$(`<i class="${classname}" aria-hidden="true" title="${title}"></i>`).appendTo(
-			this.show_or_hide_button
-		);
+		$(
+			`<i class="${classname}" aria-hidden="true" title="${title}"></i>`
+		).appendTo(this.show_or_hide_button);
 	}
 
 	setup_events() {
