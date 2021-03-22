@@ -3,7 +3,7 @@
 
 from __future__ import unicode_literals
 import frappe
-from frappe import _
+from frappe import _, is_whitelisted
 import frappe.utils
 import frappe.sessions
 import frappe.desk.form.run_method
@@ -12,7 +12,7 @@ from frappe.api import validate_auth
 from frappe.utils import cint
 from frappe.core.doctype.server_script.server_script_utils import run_server_script_api
 from werkzeug.wrappers import Response
-from six import string_types
+from six import text_type, string_types, StringIO
 
 ALLOWED_MIMETYPES = ('image/png', 'image/jpeg', 'application/pdf', 'application/msword',
 			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -75,30 +75,9 @@ def is_valid_http_method(method):
 	if http_method not in frappe.allowed_http_methods_for_whitelisted_func[method]:
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
-def is_whitelisted(method):
-	# check if whitelisted
-	if frappe.session['user'] == 'Guest':
-		if (method not in frappe.guest_methods):
-			frappe.throw(_("Not permitted"), frappe.PermissionError)
-
-		if method not in frappe.xss_safe_methods:
-			# strictly sanitize form_dict
-			# escapes html characters like <> except for predefined tags like a, b, ul etc.
-			for key, value in frappe.form_dict.items():
-				if isinstance(value, string_types):
-					frappe.form_dict[key] = frappe.utils.sanitize_html(value)
-
-	else:
-		if not method in frappe.whitelisted:
-			frappe.throw(_("Not permitted"), frappe.PermissionError)
-
 @frappe.whitelist(allow_guest=True)
 def version():
 	return frappe.__version__
-
-@frappe.whitelist()
-def runserverobj(method, docs=None, dt=None, dn=None, arg=None, args=None):
-	frappe.desk.form.run_method.runserverobj(method, docs=docs, dt=dt, dn=dn, arg=arg, args=args)
 
 @frappe.whitelist(allow_guest=True)
 def logout():
@@ -222,6 +201,85 @@ def get_attr(cmd):
 	frappe.log("method:" + cmd)
 	return method
 
-@frappe.whitelist(allow_guest = True)
+@frappe.whitelist(allow_guest=True)
 def ping():
 	return "pong"
+
+@frappe.whitelist()
+def runserverobj(method, docs=None, dt=None, dn=None, arg=None, args=None):
+	"""run controller method - old style"""
+
+	import json, inspect
+
+	if not args: args = arg or ""
+
+	if dt: # not called from a doctype (from a page)
+		if not dn: dn = dt # single
+		doc = frappe.get_doc(dt, dn)
+
+	else:
+		doc = frappe.get_doc(json.loads(docs))
+		doc._original_modified = doc.modified
+		doc.check_if_latest()
+
+	if not doc.has_permission("read"):
+		frappe.msgprint(_("Not permitted"), raise_exception = True)
+
+	if not doc:
+		return
+
+	try:
+		args = json.loads(args)
+	except ValueError:
+		args = args
+
+	method_obj = getattr(doc, method)
+	is_whitelisted(getattr(method_obj, '__func__', method_obj))
+
+	try:
+		fnargs = inspect.getargspec(method_obj)[0]
+	except ValueError:
+		fnargs = inspect.getfullargspec(method_obj).args
+
+	if not fnargs or (len(fnargs)==1 and fnargs[0]=="self"):
+		r = doc.run_method(method)
+
+	elif "args" in fnargs or not isinstance(args, dict):
+		r = doc.run_method(method, args)
+
+	else:
+		r = doc.run_method(method, **args)
+
+	frappe.response.docs.append(doc)
+
+	if not r:
+		return
+
+	# build output as csv
+	if cint(frappe.form_dict.get('as_csv')):
+		make_csv_output(r, doc.doctype)
+		return
+
+	frappe.response['message'] = r
+
+
+def make_csv_output(res, dt):
+	"""send method response as downloadable CSV file"""
+
+	import csv
+
+	f = StringIO()
+	writer = csv.writer(f)
+	for r in res:
+		row = []
+		for v in r:
+			if isinstance(v, string_types):
+				v = v.encode("utf-8")
+			row.append(v)
+		writer.writerow(row)
+
+	f.seek(0)
+
+	frappe.response['result'] = text_type(f.read(), 'utf-8')
+	frappe.response['type'] = 'csv'
+	frappe.response['doctype'] = dt.replace(' ','')
