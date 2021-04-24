@@ -22,7 +22,8 @@
   "float_precision",
   "currency_precision",
   "sec_backup_limit",
-  "backup_limit",
+  "backup_configuration_message",
+  "keep_backups_for_hours",
   "background_workers",
   "enable_scheduler",
   "dormant_days",
@@ -164,13 +165,6 @@
    "fieldname": "sec_backup_limit",
    "fieldtype": "Section Break",
    "label": "Backups"
-  },
-  {
-   "default": "3",
-   "description": "Older backups will be automatically deleted",
-   "fieldname": "backup_limit",
-   "fieldtype": "Int",
-   "label": "Number of Backups"
   },
   {
    "collapsible": 1,
@@ -469,12 +463,21 @@
    "fieldname": "strip_exif_metadata_from_uploaded_images",
    "fieldtype": "Check",
    "label": "Strip EXIF tags from uploaded images"
+  },
+  {
+   "fieldname": "backup_configuration_message",
+   "fieldtype": "HTML"
+  },
+  {
+   "fieldname": "keep_backups_for_hours",
+   "fieldtype": "Data",
+   "label": "Keep Backups for Hours"
   }
  ],
  "icon": "fa fa-cog",
  "issingle": 1,
  "links": [],
- "modified": "2021-03-30 11:47:47.330437",
+ "modified": "2021-04-22 04:25:46.477621",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "System Settings",

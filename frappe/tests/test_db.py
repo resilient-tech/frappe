@@ -47,16 +47,16 @@ class TestDB(unittest.TestCase):
 		frappe.db.escape("香港濟生堂製藥有限公司 - IT".encode("utf-8"))
 
 	def test_get_single_value(self):
-		frappe.db.set_value('System Settings', 'System Settings', 'backup_limit', 5)
+		frappe.db.set_value('System Settings', 'System Settings', 'passord_reset_limit', 5)
 		frappe.db.commit()
 
-		limit = frappe.db.get_single_value('System Settings', 'backup_limit')
+		limit = frappe.db.get_single_value('System Settings', 'passord_reset_limit')
 		self.assertEqual(limit, 5)
 
 	def test_log_touched_tables(self):
 		frappe.flags.in_migrate = True
 		frappe.flags.touched_tables = set()
-		frappe.db.set_value('System Settings', 'System Settings', 'backup_limit', 5)
+		frappe.db.set_value('System Settings', 'System Settings', 'passord_reset_limit', 5)
 		self.assertIn('tabSingles', frappe.flags.touched_tables)
 
 		frappe.flags.touched_tables = set()

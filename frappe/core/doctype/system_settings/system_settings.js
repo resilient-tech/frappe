@@ -10,8 +10,18 @@ frappe.ui.form.on("System Settings", {
 					frm.set_value(key, val);
 					frappe.sys_defaults[key] = val;
 				});
+
+				if (frm.doc.__onload && frm.doc.__onload.keep_backups_for_hours) {
+					frm.set_value('keep_backups_for_hours', frm.doc.__onload.keep_backups_for_hours)
+					frm.set_df_property("keep_backups_for_hours", "read_only", 1)
+					frm.set_df_property("keep_backups_for_hours", "description",
+						`Backups Expiry has been set internally.
+						Please contact System Administrator to override.`
+					)
+				}
 			}
 		});
+
 	},
 	enable_password_policy: function(frm) {
 		if (frm.doc.enable_password_policy == 0) {

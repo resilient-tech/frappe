@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 from __future__ import unicode_literals
+import re
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -12,6 +13,11 @@ from frappe.utils.momentjs import get_all_timezones
 from frappe.twofactor import toggle_two_factor_auth
 
 class SystemSettings(Document):
+	def onload(self):
+		if frappe.conf.keep_backups_for_hours:
+			self.set_onload('keep_backups_for_hours', frappe.conf.keep_backups_for_hours)
+
+
 	def validate(self):
 		enable_password_policy = cint(self.enable_password_policy) and True or False
 		minimum_password_score = cint(getattr(self, 'minimum_password_score', 0)) or 0
@@ -39,6 +45,10 @@ class SystemSettings(Document):
 		if (self.force_user_to_reset_password and
 			not cint(frappe.db.get_single_value("System Settings", "force_user_to_reset_password"))):
 			frappe.flags.update_last_reset_password_date = True
+
+		if (frappe.conf.keep_backups_for_hours
+			and frappe.conf.keep_backups_for_hours != self.keep_backups_for_hours):
+			self.keep_backups_for_hours = frappe.conf.keep_backups_for_hours
 
 	def on_update(self):
 		for df in self.meta.get("fields"):
