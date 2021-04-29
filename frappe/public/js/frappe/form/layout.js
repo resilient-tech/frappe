@@ -366,12 +366,8 @@ frappe.ui.form.Layout = Class.extend({
 
 		for (var i = 0, len = fields.length; i < len; i++) {
 			if (fields[i].df.fieldname == fieldname) {
-				if (shift) {
-					if (prev) {
-						this.set_focus(prev);
-					} else {
-						$(this.primary_button).focus();
-					}
+				if (shift && prev) {
+					focused = this.set_focus(prev);
 					break;
 				}
 				if (i < len - 1) {
@@ -382,8 +378,11 @@ frappe.ui.form.Layout = Class.extend({
 					break;
 				}
 			}
-			if (this.is_visible(fields[i]))
+
+			if (this.is_visible(fields[i])) {
 				prev = fields[i];
+				console.log(prev)
+			}
 		}
 
 		if (!focused) {
@@ -443,7 +442,11 @@ frappe.ui.form.Layout = Class.extend({
 			field.editor.set_focus();
 		} else if (field.$input) {
 			field.$input.focus();
+		} else {
+			return false;
 		}
+
+		return true;
 	},
 	get_open_grid_row: function () {
 		return $(".grid-row-open").data("grid_row");
