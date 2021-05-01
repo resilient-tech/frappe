@@ -663,13 +663,16 @@ export default class Grid {
 		return d;
 	}
 
-	set_focus_on_row(idx) {
-		if (!idx) {
+	set_focus_on_row(idx = -1) {
+		if (idx == -1) {
 			idx = this.grid_rows.length - 1;
 		}
 		setTimeout(() => {
+			this.grid_rows[idx].toggle_editable_row()
 			this.grid_rows[idx].row
-				.find('input[type="Text"],textarea,select').filter(':visible:first').focus();
+				.find('input[type="Text"],textarea,select')
+				.filter(':visible:first')
+				.focus();
 		}, 100);
 	}
 

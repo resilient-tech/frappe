@@ -336,117 +336,81 @@ frappe.ui.form.Layout = Class.extend({
 		});
 	},
 	setup_tabbing: function () {
-		var me = this;
-		this.wrapper.on("keydown", function (ev) {
-			if (ev.which == 9) {
-				var current = $(ev.target),
-					doctype = current.attr("data-doctype"),
-					fieldname = current.attr("data-fieldname");
-				if (doctype)
-					return me.handle_tab(doctype, fieldname, ev.shiftKey);
+		const me = this;
+		me.wrapper.on("keydown", function (ev) {
+			if (ev.which != TAB) return;
+			const current = $(ev.target),
+				doctype = current.attr("data-doctype"),
+				fieldname = current.attr("data-fieldname");
+			if (fieldname) {
+				ev.preventDefault();
+				return me.handle_tab(doctype, fieldname, ev.shiftKey);
 			}
 		});
 	},
 	handle_tab: function (doctype, fieldname, shift) {
-		var me = this,
+		let me = this,
 			grid_row = null,
-			prev = null,
 			fields = me.fields_list,
-			in_grid = false,
 			focused = false;
 
-		// in grid
-		if (doctype != me.doctype) {
-			grid_row = me.get_open_grid_row();
-			if (!grid_row || !grid_row.layout) {
-				return;
-			}
-			fields = grid_row.layout.fields_list;
+		const field_index = fields.findIndex((field) => {
+			if (doctype != me.doctype && field.grid)
+				return field.grid.doctype == doctype;
+
+			return field.df.fieldname === fieldname;
+		});
+
+		fields = shift
+			? fields.slice(0, field_index).reverse()
+			: fields.slice(field_index + 1);
+
+		for (let i = 0, len = fields.length; i < len; i++) {
+			if(!this.is_visible(fields[i])) continue;
+
+			focused = this.set_focus(fields[i], shift);
+			break;
 		}
 
-		for (var i = 0, len = fields.length; i < len; i++) {
-			if (fields[i].df.fieldname == fieldname) {
-				if (shift && prev) {
-					focused = this.set_focus(prev);
-					break;
-				}
-				if (i < len - 1) {
-					focused = me.focus_on_next_field(i, fields);
-				}
+		if (!focused && !grid_row)
+			$(this.primary_button).trigger("focus");
 
-				if (focused) {
-					break;
-				}
-			}
-
-			if (this.is_visible(fields[i])) {
-				prev = fields[i];
-				console.log(prev)
-			}
-		}
-
-		if (!focused) {
-			// last field in this group
-			if (grid_row) {
-				// in grid
-				if (grid_row.doc.idx == grid_row.grid.grid_rows.length) {
-					// last row, close it and find next field
-					grid_row.toggle_view(false, function () {
-						grid_row.grid.frm.layout.handle_tab(grid_row.grid.df.parent, grid_row.grid.df.fieldname);
-					});
-				} else {
-					// next row
-					grid_row.grid.grid_rows[grid_row.doc.idx].toggle_view(true);
-				}
-			} else {
-				$(this.primary_button).focus();
-			}
-		}
-
-		return false;
-	},
-	focus_on_next_field: function (start_idx, fields) {
-		// loop to find next eligible fields
-		for (var i = start_idx + 1, len = fields.length; i < len; i++) {
-			var field = fields[i];
-			if (this.is_visible(field)) {
-				if (field.df.fieldtype === "Table") {
-					// open table grid
-					if (!(field.grid.grid_rows && field.grid.grid_rows.length)) {
-						// empty grid, add a new row
-						field.grid.add_new_row();
-					}
-					// show grid row (if exists)
-					field.grid.grid_rows[0].show_form();
-					return true;
-
-				} else if (!in_list(frappe.model.no_value_type, field.df.fieldtype)) {
-					this.set_focus(field);
-					return true;
-				}
-			}
-		}
 	},
 	is_visible: function (field) {
-		return field.disp_status === "Write" && (field.$wrapper && field.$wrapper.is(":visible"));
+		return (
+			field.disp_status === "Write" &&
+			field.$wrapper &&
+			field.$wrapper.is(":visible")
+		);
+
 	},
-	set_focus: function (field) {
-		// next is table, show the table
+	set_focus: function (field, shift = false) {
 		if (field.df.fieldtype=="Table") {
 			if (!field.grid.grid_rows.length) {
-				field.grid.add_new_row(1);
-			} else {
-				field.grid.grid_rows[0].toggle_view(true);
+				field.grid.grid_buttons.find('.grid-add-row')[0].focus()
+				return true;
 			}
-		} else if (field.editor) {
-			field.editor.set_focus();
-		} else if (field.$input) {
-			field.$input.focus();
-		} else {
-			return false;
+
+			if (shift) field.grid.set_focus_on_row();
+			else field.grid.set_focus_on_row(0);
+
+			return true;
 		}
 
-		return true;
+		if (field.quill) {
+			field.set_focus();
+			return true;
+		}
+
+		if (field.editor) {
+			field.editor.focus();
+			return true;
+		}
+
+		if (field.$input) {
+			field.$input.focus();
+			return true;
+		}
 	},
 	get_open_grid_row: function () {
 		return $(".grid-row-open").data("grid_row");

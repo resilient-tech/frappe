@@ -466,28 +466,21 @@ export default class GridRow {
 				};
 
 				// TAB
-				if (e.which === TAB && !e.shiftKey) {
-					var last_column = me.wrapper.find(':input:enabled:last').get(0);
-					var is_last_column = $(this).attr('data-last-input') || last_column === this;
-
-					if (is_last_column) {
-						// last row
-						if (me.doc.idx === values.length) {
-							setTimeout(function () {
-								me.grid.add_new_row(null, null, true);
-								me.grid.grid_rows[me.grid.grid_rows.length - 1].toggle_editable_row();
-								me.grid.set_focus_on_row();
-							}, 100);
-						} else {
-							// last column before last row
-							me.grid.grid_rows[me.doc.idx].toggle_editable_row();
-							me.grid.set_focus_on_row(me.doc.idx);
-							return false;
-						}
+				if (frappe.ui.keys.get_key(e) === 'ctrl+down') {
+					// last row
+					if (me.doc.idx === values.length) {
+						setTimeout(function () {
+							me.grid.add_new_row(null, null, true);
+							me.grid.set_focus_on_row();
+						}, 100);
+					} else {
+						// last column before last row
+						me.grid.set_focus_on_row(me.doc.idx);
+						return false;
 					}
 				} else if (e.which === UP_ARROW) {
 					if (me.doc.idx > 1) {
-						var prev = me.grid.grid_rows[me.doc.idx-2];
+						var prev = me.grid.grid_rows[me.doc.idx - 2];
 						if (move_up_down(prev)) {
 							return false;
 						}
@@ -499,8 +492,43 @@ export default class GridRow {
 							return false;
 						}
 					}
-				}
+				} else if (e.which === TAB) {
+					const last_column = me.wrapper.find(':input:enabled:last').get(0);
+					const is_last_column = $(this).attr('data-last-input') || last_column === this;
+					const col_idx = parseInt($(this).attr('data-col-idx'));
 
+					if(e.shiftKey) {
+						if(col_idx == 0 && me.doc.idx > 1){
+							const previous_row = me.grid.grid_rows[me.doc.idx - 2]
+							previous_row.toggle_editable_row();
+							previous_row.on_grid_fields[
+								previous_row.on_grid_fields.length - 1
+							].$input.focus()
+							return false;
+						}
+
+						if(col_idx != 0) {
+							me.grid.grid_rows[me.doc.idx - 1].on_grid_fields[
+								col_idx - 1
+							].$input.focus();
+							return false;
+						}
+
+						return;
+					}
+
+					if (is_last_column && me.doc.idx != values.length) {
+						me.grid.set_focus_on_row(me.doc.idx);
+						return false;
+					}
+
+					if (!is_last_column) {
+						me.grid.grid_rows[me.doc.idx - 1].on_grid_fields[
+							col_idx + 1
+						].$input.focus();
+						return false;
+					}
+				}
 			});
 		}
 	}

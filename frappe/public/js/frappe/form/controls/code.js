@@ -27,10 +27,7 @@ frappe.ui.form.ControlCode = frappe.ui.form.ControlText.extend({
 		this.set_language();
 
 		// events
-		this.editor.session.on('change', frappe.utils.debounce(() => {
-			const input_value = this.get_input_value();
-			this.parse_validate_and_set_in_model(input_value);
-		}, 300));
+		this.bind_events()
 
 		// setup autocompletion when it is set the first time
 		Object.defineProperty(this.df, 'autocompletions', {
@@ -40,6 +37,19 @@ frappe.ui.form.ControlCode = frappe.ui.form.ControlText.extend({
 			set: (value) => {
 				this.setup_autocompletion();
 				this.df._autocompletions = value;
+			}
+		});
+	},
+
+	bind_events() {
+		this.editor.session.on('change', frappe.utils.debounce(() => {
+			const input_value = this.get_input_value();
+			this.parse_validate_and_set_in_model(input_value);
+		}, 300));
+
+		$(this.editor.container).on('keydown', (e) => {
+			if (frappe.ui.keys.get_key(e) === 'escape') {
+				this.editor.blur();
 			}
 		});
 	},
