@@ -75,6 +75,7 @@ class BaseDocument(object):
 	ignore_in_getter = ("doctype", "_meta", "meta", "_table_fields", "_valid_columns")
 
 	def __init__(self, d):
+		self.method_names = dir(self)
 		self.update(d)
 		self.dont_update_if_missing = []
 
@@ -101,15 +102,18 @@ class BaseDocument(object):
 				"balance": 42000
 			})
 		"""
-		if "doctype" in d:
-			self.set("doctype", d.get("doctype"))
+		if not self.get("doctype") and "doctype" in d:
+			self.set("doctype", d["doctype"])
 
 		# first set default field values of base document
-		for key in default_fields:
+		for key in default_fields[1:]:
 			if key in d:
 				self.set(key, d.get(key))
 
 		for key, value in d.items():
+			if key == "doctype" or key in self.method_names:
+				continue
+
 			self.set(key, value)
 
 		return self
