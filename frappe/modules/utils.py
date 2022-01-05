@@ -182,7 +182,7 @@ def export_doc(doctype, name, module=None):
 def get_doctype_module(doctype):
 	"""Returns **Module Def** name of given doctype."""
 	def make_modules_dict():
-		return dict(frappe.db.sql("select name, module from tabDocType"))
+		return dict(frappe.get_all("DocType", fields=("name", "module"), as_list=True))
 	return frappe.cache().get_value("doctype_modules", make_modules_dict)[doctype]
 
 doctype_python_modules = {}
@@ -192,26 +192,32 @@ def load_doctype_module(doctype, module=None, prefix="", suffix=""):
 		module = get_doctype_module(doctype)
 
 	app = get_module_app(module)
+	module_path = get_module_name(doctype, module, prefix, suffix, app)
 
 	key = (app, doctype, prefix, suffix)
-
-	module_name = get_module_name(doctype, module, prefix, suffix)
-
-	try:
-		if key not in doctype_python_modules:
-			doctype_python_modules[key] = frappe.get_module(module_name)
-	except ImportError as e:
-		raise ImportError('Module import failed for {0} ({1})'.format(doctype, module_name + ' Error: ' + str(e)))
+	if key not in doctype_python_modules:
+		doctype_python_modules[key] = get_module(doctype, module_path)
 
 	return doctype_python_modules[key]
 
+def get_module(doctype, module_path):
+	try:
+		return frappe.get_module(module_path)
+	except ImportError as e:
+		raise ImportError(
+			"Module import failed for {0} ({1} Error: {2})".format(
+				doctype, module_path, str(e)
+			)
+		)
+
 def get_module_name(doctype, module, prefix="", suffix="", app=None):
-	return '{app}.{module}.doctype.{doctype}.{prefix}{doctype}{suffix}'.format(\
+	return "{app}.{module}.doctype.{doctype}.{prefix}{doctype}{suffix}".format(
 		app = scrub(app or get_module_app(module)),
 		module = scrub(module),
 		doctype = scrub(doctype),
 		prefix=prefix,
-		suffix=suffix)
+		suffix=suffix
+	)
 
 def get_module_app(module):
 	return frappe.local.module_app[scrub(module)]
