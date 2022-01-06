@@ -22,6 +22,7 @@ from werkzeug.local import Local, release_local
 import sys, importlib, inspect, json
 import typing
 import click
+import copy
 
 # Local application imports
 from .exceptions import *
@@ -857,7 +858,7 @@ def get_cached_doc(*args, **kwargs):
 		doc = cache().hget('document_cache', key)
 		if doc:
 			doc = get_doc(doc)
-			local.document_cache[key] = doc
+			local.document_cache[key] = copy.deepcopy(doc)
 			return doc
 
 	# database
@@ -909,7 +910,7 @@ def get_doc(*args, **kwargs):
 	# set in cache
 	if args and len(args) > 1:
 		key = get_document_cache_key(args[0], args[1])
-		local.document_cache[key] = doc
+		local.document_cache[key] = copy.deepcopy(doc)
 		cache().hset('document_cache', key, doc.as_dict())
 
 	return doc
@@ -1291,8 +1292,6 @@ def import_doc(path):
 
 def copy_doc(doc, ignore_no_copy=True):
 	""" No_copy fields also get copied."""
-	import copy
-
 	def remove_no_copy_fields(d):
 		for df in d.meta.get("fields", {"no_copy": 1}):
 			if hasattr(d, df.fieldname):
