@@ -6,7 +6,6 @@ frappe.provide('frappe.views.list_view');
 window.cur_list = null;
 frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
 	make (route) {
-		var me = this;
 		var doctype = route[1];
 
 		// List / Gantt / Kanban / etc
@@ -26,12 +25,12 @@ frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
 		if (!frappe.views.list_view[page_name]) {
 			frappe.views.list_view[page_name] = new view_class({
 				doctype: doctype,
-				parent: me.make_page(true, page_name)
+				parent: this.make_page(true, page_name)
 			});
 		} else {
 			frappe.container.change_to(page_name);
 		}
-		me.set_cur_list();
+		this.set_cur_list();
 
 
 	}
@@ -42,8 +41,6 @@ frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
 		}
 		this.set_module_breadcrumb();
 		super.show();
-		this.set_cur_list();
-		cur_list && cur_list.show();
 	}
 
 	re_route_to_view() {
