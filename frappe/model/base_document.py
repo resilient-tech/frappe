@@ -19,6 +19,13 @@ max_positive_value = {
 }
 
 DOCTYPES_FOR_DOCTYPE = ('DocType', 'DocField', 'DocPerm', 'DocType Action', 'DocType Link')
+DOCTYPE_TABLE_FIELDS = [
+	frappe._dict({"fieldname": "fields", "options": "DocField"}),
+	frappe._dict({"fieldname": "permissions", "options": "DocPerm"}),
+	frappe._dict({"fieldname": "actions", "options": "DocType Action"}),
+	frappe._dict({"fieldname": "links", "options": "DocType Link"}),
+	frappe._dict({"fieldname": "states", "options": "DocType State"}),
+]
 
 
 def get_controller(doctype):
@@ -162,7 +169,11 @@ class BaseDocument(object):
 		if key in self.ignore_in_setter:
 			return
 
-		if isinstance(value, list) and not as_value:
+		if (
+			not as_value
+			and isinstance(value, list)
+			and key not in self.get_table_fieldnames()
+		):
 			self.__dict__[key] = []
 			self.extend(key, value)
 		else:
@@ -386,6 +397,19 @@ class BaseDocument(object):
 
 	def as_json(self):
 		return frappe.as_json(self.as_dict())
+
+	def get_table_fieldnames(self):
+		if not self.doctype:
+			return []
+
+		if self.doctype != "DocType":
+			_table_fields = self.meta.get(
+				'fields', {"fieldtype": ['in', table_fields]}
+			)
+		else:
+			_table_fields = DOCTYPE_TABLE_FIELDS
+
+		return [field.fieldname for field in _table_fields]
 
 	def get_table_field_doctype(self, fieldname):
 		try:

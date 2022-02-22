@@ -14,7 +14,7 @@ from frappe.utils import get_html_format
 
 def get_meta(doctype, cached=True):
 	# don't cache for developer mode as js files, templates may be edited
-	if cached and not frappe.conf.developer_mode:
+	if cached and not frappe.conf.developer_mode or True:
 		meta = frappe.cache().hget("form_meta", doctype)
 		if meta:
 			meta = FormMeta(meta)
