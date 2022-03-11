@@ -23,7 +23,7 @@ ASSET_KEYS = (
 
 def get_meta(doctype, cached=True):
 	# don't cache for developer mode as js files, templates may be edited
-	if cached and not frappe.conf.developer_mode:
+	if False and cached and not frappe.conf.developer_mode:
 		meta = frappe.cache().hget("form_meta", doctype)
 		if meta:
 			meta = FormMeta(meta)
@@ -31,7 +31,11 @@ def get_meta(doctype, cached=True):
 			meta = FormMeta(doctype)
 			frappe.cache().hset("form_meta", doctype, meta.as_dict())
 	else:
-		meta = FormMeta(doctype)
+		if doctype in frappe.form_meta_cache:
+			meta = frappe.form_meta_cache[doctype]
+		else:
+			meta = FormMeta(doctype)
+			frappe.form_meta_cache[doctype] = meta
 
 	if frappe.local.lang != 'en':
 		meta.set_translations(frappe.local.lang)

@@ -41,6 +41,8 @@ __version__ = '14.0.0-dev'
 __title__ = "Frappe Framework"
 
 local = Local()
+meta_cache = {}
+form_meta_cache = {}
 controllers = {}
 
 class _dict(dict):
@@ -213,7 +215,7 @@ def init(site, sites_path=None, new_site=False):
 	local.jloader =None
 	local.cache = {}
 	local.document_cache = {}
-	local.meta_cache = {}
+	local.meta_cache = meta_cache
 	local.form_dict = _dict()
 	local.session = _dict()
 	local.dev_server = _dev_server
