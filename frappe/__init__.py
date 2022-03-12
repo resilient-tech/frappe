@@ -43,6 +43,7 @@ __title__ = "Frappe Framework"
 local = Local()
 meta_cache = {}
 form_meta_cache = {}
+document_cache = {}
 controllers = {}
 
 class _dict(dict):
@@ -214,7 +215,7 @@ def init(site, sites_path=None, new_site=False):
 	local.jenv = None
 	local.jloader =None
 	local.cache = {}
-	local.document_cache = {}
+	local.document_cache = document_cache
 	local.meta_cache = meta_cache
 	local.form_dict = _dict()
 	local.session = _dict()
@@ -1903,3 +1904,7 @@ def mock(type, size=1, locale='en'):
 def validate_and_sanitize_search_inputs(fn):
 	from frappe.desk.search import validate_and_sanitize_search_inputs as func
 	return func(fn)
+
+@whitelist()
+def is_cached():
+	return str(meta_cache), str(form_meta_cache), str(flags)

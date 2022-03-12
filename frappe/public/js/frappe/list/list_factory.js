@@ -43,7 +43,7 @@ frappe.views.ListFactory = class ListFactory extends frappe.views.Factory {
 		this.set_module_breadcrumb();
 		super.show();
 		this.set_cur_list();
-		cur_list && cur_list.show();
+		// cur_list && cur_list.show();
 	}
 
 	re_route_to_view() {
