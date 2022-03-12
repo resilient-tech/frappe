@@ -44,6 +44,7 @@ local = Local()
 meta_cache = {}
 form_meta_cache = {}
 document_cache = {}
+___cache = {}
 controllers = {}
 
 class _dict(dict):
@@ -214,7 +215,7 @@ def init(site, sites_path=None, new_site=False):
 
 	local.jenv = None
 	local.jloader =None
-	local.cache = {}
+	local.cache = ___cache
 	local.document_cache = document_cache
 	local.meta_cache = meta_cache
 	local.form_dict = _dict()
@@ -860,12 +861,6 @@ def get_cached_doc(*args, **kwargs):
 		if doc:
 			return doc
 
-		# redis cache
-		doc = cache().hget('document_cache', key)
-		if doc:
-			doc = get_doc(doc)
-			local.document_cache[key] = doc
-			return doc
 
 	# database
 	doc = get_doc(*args, **kwargs)
@@ -936,7 +931,6 @@ def get_doc(*args, **kwargs):
 	key = can_cache_doc(args)
 	if key:
 		local.document_cache[key] = doc
-		cache().hset('document_cache', key, doc.as_dict())
 
 	return doc
 
@@ -1907,4 +1901,4 @@ def validate_and_sanitize_search_inputs(fn):
 
 @whitelist()
 def is_cached():
-	return str(meta_cache), str(form_meta_cache), str(flags)
+	return str(meta_cache), str(form_meta_cache), str(___cache), str(document_cache)

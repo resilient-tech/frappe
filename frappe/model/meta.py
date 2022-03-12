@@ -40,12 +40,7 @@ from frappe.utils import cast, cint, cstr
 def get_meta(doctype, cached=True):
 	if cached:
 		if not frappe.local.meta_cache.get(doctype):
-			meta = frappe.cache().hget("meta", doctype)
-			if meta:
-				meta = Meta(meta)
-			else:
-				meta = Meta(doctype)
-				frappe.cache().hset('meta', doctype, meta.as_dict())
+			meta = Meta(doctype)
 			frappe.local.meta_cache[doctype] = meta
 
 		return frappe.local.meta_cache[doctype]
