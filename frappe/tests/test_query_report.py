@@ -76,7 +76,7 @@ class TestQueryReport(unittest.TestCase):
 			report.db_set("report_type", "Report Builder")
 			self.assertRaisesRegex(
 				frappe.ValidationError,
-				"Reports of type Report Builder can not be deleted",
+				"Only reports of type Custom Report can be deleted",
 				delete_report,
 				report.name,
 			)

@@ -136,6 +136,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 
 		frappe.run_serially([
 			() => this.get_report_doc(),
+			() => this.menu_items = this.get_menu_items(),
 			() => this.get_report_settings(),
 			() => this.setup_progress_bar(),
 			() => this.setup_page_head(),
@@ -367,7 +368,6 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 	}
 
 	get_report_settings() {
-		this.menu_items = this.get_menu_items();
 		return new Promise((resolve, reject) => {
 			if (frappe.query_reports[this.report_name]) {
 				this.report_settings = frappe.query_reports[this.report_name];
@@ -465,7 +465,20 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 
 	setup_filters() {
 		this.clear_filters();
-		const { filters = [] } = this.report_settings;
+
+		var stored_filter;
+		var custom_filters = localStorage.getItem(this.report_name);
+		console.log(custom_filters);
+		console.log(custom_filters['from_date']);
+
+		if (custom_filters !== 'undefined' || custom_filters !== "" || custom_filters !== null) {
+			const filterArray = Object.entries(custom_filters);
+			stored_filter = filterArray;
+		}
+
+		let { filters = [] } = this.report_settings;
+
+		console.log(filters);
 
 		let filter_area = this.page.page_form;
 
@@ -474,7 +487,17 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 
 			let f = this.page.add_field(df, filter_area);
 
-			if (df.default) {
+			if (stored_filter) {
+				stored_filter.forEach(([key, value]) => {
+					if (key === df.fieldname) {
+						f.set_input(value);
+					}
+				})
+			}
+			// if (stored_filter) {
+			// 	this.set_filters(stored_filter);
+			// }
+			else if (df.default) {
 				f.set_input(df.default);
 			}
 
@@ -1437,6 +1460,10 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 
 	save_report(save_type) {
 		const _save_report = (name) => {
+			let current_filter = this.get_filter_values();
+			
+			localStorage.setItem(name, current_filter);
+			
 			return frappe.call({
 				method: "frappe.desk.query_report.save_report",
 				args: {
@@ -1461,7 +1488,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 						fieldtype: 'Data',
 						fieldname: 'report_name',
 						label: __("Report Name"),
-						default: this.report_doc.is_standard == 'No' ? this.report_name : "",
+						default: "",
 						reqd: true
 					}
 				],
@@ -1634,7 +1661,6 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 
 		const can_edit_or_delete = (action) => {
 			const method = action == "delete" ? "can_delete" : "can_write";
-			console.log(this.report_doc)
 			return (
 				this.report_doc
 				&& this.report_doc.is_standard !== "Yes"
@@ -1649,14 +1675,16 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 		if (can_edit_or_delete()) {
 			items.push({
 				label: __("Save"),
-				action: () => this.save_report('save')
+				action: () => this.save_report('save'),
+				standard: true
 			});
 		}
 
 		// anyone can save as
 		items.push({
 			label: __('Save As'),
-			action: () => this.save_report('save_as')
+			action: () => this.save_report('save_as'),
+			standard: true
 		});
 
 		// A user with role Report Manager or Report Owner can delete
@@ -1667,6 +1695,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 					"Are you sure you want to delete this report?",
 					() => this.delete_report(),
 				),
+				standard: true,
 				shortcut: "Shift+Ctrl+D"
 			});
 		}

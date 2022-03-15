@@ -570,23 +570,14 @@ def get_data_for_custom_report(columns):
 def save_report(reference_report, report_name, columns):
 	report_doc = get_report_doc(reference_report)
 
-	docname = frappe.db.exists(
-		"Report",
-		{
-			"report_name": report_name,
-			"is_standard": "No",
-			"report_type": "Custom Report",
-		},
-	)
-
-	if docname:
-		report = frappe.get_doc("Report", docname)
+	if frappe.db.exists("Report", report_name):
+		report = frappe.get_doc("Report", report_name)
 
 		if report.is_standard == "Yes":
 			frappe.throw(_("Standard Reports cannot be edited"))
 
-		if report.report_type not in ("Query Report", "Script Report", "Custom Report"):
-			frappe.throw(_("Reports of type Report Builder can not be edited"))
+		if report.report_type != "Custom Report":
+			frappe.throw(_("Only reports of type Custom Report can be edited"))
 
 		if report.owner != frappe.session.user and not frappe.has_permission(
 			"Report", "write"
@@ -599,9 +590,10 @@ def save_report(reference_report, report_name, columns):
 		existing_jd["columns"] = json.loads(columns)
 		report.update({"json": json.dumps(existing_jd, separators=(",", ":"))})
 		report.save()
-		frappe.msgprint(_("Report updated successfully"))
+		frappe.msgprint(_("Report updated successfully"),indicator="green",
+		alert=True,)
 
-		return docname
+		return report.name
 	else:
 		new_report = frappe.get_doc(
 			{
@@ -614,7 +606,8 @@ def save_report(reference_report, report_name, columns):
 				"reference_report": reference_report,
 			}
 		).insert(ignore_permissions=True)
-		frappe.msgprint(_("{0} saved successfully").format(new_report.name))
+		frappe.msgprint(_("{0} saved successfully").format(frappe.bold(new_report.name)),indicator="green",
+		alert=True,)
 		return new_report.name
 
 
@@ -626,8 +619,8 @@ def delete_report(name):
 	if report.is_standard == "Yes":
 		frappe.throw(_("Standard Reports cannot be deleted"))
 
-	if report.report_type not in ("Query Report", "Script Report", "Custom Report"):
-		frappe.throw(_("Reports of type Report Builder can not be deleted"))
+	if report.report_type != "Custom Report":
+		frappe.throw(_("Only reports of type Custom Report can be deleted"))
 
 	if report.owner != frappe.session.user and not frappe.has_permission(
 		"Report", "delete"
