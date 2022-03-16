@@ -567,7 +567,7 @@ def get_data_for_custom_report(columns):
 
 
 @frappe.whitelist()
-def save_report(reference_report, report_name, columns):
+def save_report(reference_report, report_name, columns, filters):
 	report_doc = get_report_doc(reference_report)
 
 	if frappe.db.exists("Report", report_name):
@@ -588,6 +588,7 @@ def save_report(reference_report, report_name, columns):
 
 		existing_jd = json.loads(report.json)
 		existing_jd["columns"] = json.loads(columns)
+		existing_jd["filters"] = json.loads(filters)
 		report.update({"json": json.dumps(existing_jd, separators=(",", ":"))})
 		report.save()
 		frappe.msgprint(_("Report updated successfully"),indicator="green",

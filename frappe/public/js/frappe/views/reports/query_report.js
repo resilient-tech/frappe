@@ -363,6 +363,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 		return frappe.model.with_doc('Report', this.report_name)
 			.then(doc => {
 				this.report_doc = doc;
+				this.report_doc.json = JSON.parse(this.report_doc.json);
 			})
 			.then(() => frappe.model.with_doctype(this.report_doc.ref_doctype));
 	}
@@ -466,37 +467,20 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 	setup_filters() {
 		this.clear_filters();
 
-		var stored_filter;
-		var custom_filters = localStorage.getItem(this.report_name);
-		console.log(custom_filters);
-		console.log(custom_filters['from_date']);
-
-		if (custom_filters !== 'undefined' || custom_filters !== "" || custom_filters !== null) {
-			const filterArray = Object.entries(custom_filters);
-			stored_filter = filterArray;
-		}
-
 		let { filters = [] } = this.report_settings;
-
-		console.log(filters);
 
 		let filter_area = this.page.page_form;
 
+		var custom_filters = this.report_doc.json.filters;
+			
 		this.filters = filters.map(df => {
 			if (df.fieldtype === 'Break') return;
 
 			let f = this.page.add_field(df, filter_area);
 
-			if (stored_filter) {
-				stored_filter.forEach(([key, value]) => {
-					if (key === df.fieldname) {
-						f.set_input(value);
-					}
-				})
+			if (df.fieldname in custom_filters) {
+				f.set_input(custom_filters[df.fieldname]);
 			}
-			// if (stored_filter) {
-			// 	this.set_filters(stored_filter);
-			// }
 			else if (df.default) {
 				f.set_input(df.default);
 			}
@@ -507,12 +491,12 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 			df.onchange = () => {
 				this.refresh_filters_dependency();
 
-				let current_filters = this.get_filter_values();
 				if (this.previous_filters
 					&& (JSON.stringify(this.previous_filters) === JSON.stringify(current_filters))) {
 					// filter values have not changed
 					return;
 				}
+				
 
 				// clear previous_filters after 10 seconds, to allow refresh for new data
 				this.previous_filters = current_filters;
@@ -520,14 +504,15 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 
 				if (f.on_change) {
 					f.on_change(this);
-				} else {
-					if (this.prepared_report) {
-						this.reset_report_view();
-					}
-					else if (!this._no_refresh) {
-						this.refresh();
-					}
 				}
+				//  else {
+				// 	if (this.prepared_report) {
+				// 		this.reset_report_view();
+				// 	}
+				// 	// else if (!this._no_refresh) {
+				// 	// 	this.refresh();
+				// 	// }
+				// }
 			};
 
 			f = Object.assign(f, df);
@@ -546,6 +531,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 	}
 
 	set_filters(filters) {
+		console.log(filters);
 		this.filters.map(f => {
 			f.set_input(filters[f.fieldname]);
 		});
@@ -1459,17 +1445,14 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 	}
 
 	save_report(save_type) {
-		const _save_report = (name) => {
-			let current_filter = this.get_filter_values();
-			
-			localStorage.setItem(name, current_filter);
-			
+		const _save_report = (name) => {			
 			return frappe.call({
 				method: "frappe.desk.query_report.save_report",
 				args: {
 					reference_report: this.report_name,
 					report_name: name,
-					columns: this.get_visible_columns()
+					columns: this.get_visible_columns(),
+					filters: this.get_filter_values()
 				},
 				callback: function (r) {
 					this.show_save = false;
