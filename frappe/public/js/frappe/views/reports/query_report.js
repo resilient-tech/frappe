@@ -467,7 +467,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 	setup_filters() {
 		this.clear_filters();
 
-		let { filters = [] } = this.report_settings;
+		const { filters = [] } = this.report_settings;
 
 		let filter_area = this.page.page_form;
 
@@ -491,6 +491,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 			df.onchange = () => {
 				this.refresh_filters_dependency();
 
+				let current_filters = this.get_filter_values();
 				if (this.previous_filters
 					&& (JSON.stringify(this.previous_filters) === JSON.stringify(current_filters))) {
 					// filter values have not changed
@@ -501,18 +502,18 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 				// clear previous_filters after 10 seconds, to allow refresh for new data
 				this.previous_filters = current_filters;
 				setTimeout(() => this.previous_filters = null, 10000);
-
+					
 				if (f.on_change) {
 					f.on_change(this);
 				}
-				//  else {
-				// 	if (this.prepared_report) {
-				// 		this.reset_report_view();
-				// 	}
-				// 	// else if (!this._no_refresh) {
-				// 	// 	this.refresh();
-				// 	// }
-				// }
+				 else {
+					if (this.prepared_report) {
+						this.reset_report_view();
+					}
+					else if (!this._no_refresh) {
+						this.refresh();
+					}
+				}
 			};
 
 			f = Object.assign(f, df);
