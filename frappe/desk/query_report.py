@@ -384,7 +384,7 @@ def build_xlsx_data(data, visible_idx, include_indentation, ignore_visible_idx=F
 		result[0].append(_(column.get("label")))
 		column_width = cint(column.get('width', 0))
 		# to convert into scale accepted by openpyxl
-		column_width /= 10
+		# column_width /= 10
 		column_widths.append(column_width)
 
 	# build table from result

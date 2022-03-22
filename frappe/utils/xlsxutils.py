@@ -1,13 +1,12 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
+from math import fabs
 import re
 from io import BytesIO
 
-import openpyxl
 import xlrd
-from openpyxl import load_workbook
-from openpyxl.styles import Font
-from openpyxl.utils import get_column_letter
+from xlsxwriter.workbook import Workbook as wkb
+import pylightxl
 
 import frappe
 from frappe.utils.html_utils import unescape_html
@@ -18,20 +17,23 @@ ILLEGAL_CHARACTERS_RE = re.compile(r'[\000-\010]|[\013-\014]|[\016-\037]')
 # return xlsx file object
 def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 	column_widths = column_widths or []
+	xlsx_file = BytesIO()
 	if wb is None:
-		wb = openpyxl.Workbook(write_only=True)
+		wb = wkb(xlsx_file)
 
-	ws = wb.create_sheet(sheet_name, 0)
-
+	ws = wb.add_worksheet(sheet_name)
+	flagg = 0
+	
 	for i, column_width in enumerate(column_widths):
 		if column_width:
-			ws.column_dimensions[get_column_letter(i + 1)].width = column_width
+			flagg = 1
+			ws.set_column(i, i, column_width)
 
-	row1 = ws.row_dimensions[1]
-	row1.font = Font(name='Calibri', bold=True)
-
+	bold_format = wb.add_format({'bold': True})
+	bold_format.set_font_name('Calibri') # Could cause an issue.
+	ws.set_row(0,None,bold_format)
+	idr = 0
 	for row in data:
-		clean_row = []
 		for item in row:
 			if isinstance(item, str) and (sheet_name not in ['Data Import Template', 'Data Export']):
 				value = handle_html(item)
@@ -39,15 +41,18 @@ def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 				value = item
 
 			if isinstance(item, str) and next(ILLEGAL_CHARACTERS_RE.finditer(value), None):
-				# Remove illegal characters from the string
 				value = re.sub(ILLEGAL_CHARACTERS_RE, '', value)
 
-			clean_row.append(value)
+			ws.write(idr, row.index(item), value)
+		
+		idr+=1
 
-		ws.append(clean_row)
+	if flagg == 1:
+		ws.write(27,0,'It does ') 
+	else:
+		ws.write(27,0,str(column_widths)) 
 
-	xlsx_file = BytesIO()
-	wb.save(xlsx_file)
+	wb.close()
 	return xlsx_file
 
 
@@ -91,9 +96,9 @@ def read_xlsx_file_from_attached_file(file_url=None, fcontent=None, filepath=Non
 		return
 
 	rows = []
-	wb1 = load_workbook(filename=filename, read_only=True, data_only=True)
-	ws1 = wb1.active
-	for row in ws1.iter_rows():
+	wb1 = pylightxl.readxl(fn=filename)
+	ws1 = wb1.ws(wb1.ws_names[0])#migt not be the active one || search on the net man.
+	for row in ws1.rows:
 		tmp_list = []
 		for cell in row:
 			tmp_list.append(cell.value)
