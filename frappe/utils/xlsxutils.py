@@ -22,16 +22,11 @@ def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 		wb = wkb(xlsx_file)
 
 	ws = wb.add_worksheet(sheet_name)
-	flagg = 0
-	
-	for i, column_width in enumerate(column_widths):
-		if column_width:
-			flagg = 1
-			ws.set_column(i, i, column_width)
 
 	bold_format = wb.add_format({'bold': True})
-	bold_format.set_font_name('Calibri') # Could cause an issue.
+	bold_format.set_font_name('Calibri')
 	ws.set_row(0,None,bold_format)
+
 	idr = 0
 	for row in data:
 		for item in row:
@@ -44,13 +39,18 @@ def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 				value = re.sub(ILLEGAL_CHARACTERS_RE, '', value)
 
 			ws.write(idr, row.index(item), value)
+			try:
+				column_widths[row.index(item)]
+				if column_widths[row.index(item)] < len(str(value)):
+						column_widths[row.index(item)] = len(str(value))
+			except:
+				column_widths.append(len(str(value)))
 		
 		idr+=1
 
-	if flagg == 1:
-		ws.write(27,0,'It does ') 
-	else:
-		ws.write(27,0,str(column_widths)) 
+	for i, column_width in enumerate(column_widths):
+		if column_width > 0:
+			ws.set_column(i, i, column_width)
 
 	wb.close()
 	return xlsx_file
@@ -101,7 +101,7 @@ def read_xlsx_file_from_attached_file(file_url=None, fcontent=None, filepath=Non
 	for row in ws1.rows:
 		tmp_list = []
 		for cell in row:
-			tmp_list.append(cell.value)
+			tmp_list.append(cell)
 		rows.append(tmp_list)
 	return rows
 
@@ -122,3 +122,4 @@ def build_xlsx_response(data, filename):
 	frappe.response['filename'] = filename + '.xlsx'
 	frappe.response['filecontent'] = xlsx_file.getvalue()
 	frappe.response['type'] = 'binary'
+	
