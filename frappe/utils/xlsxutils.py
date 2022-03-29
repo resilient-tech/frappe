@@ -1,6 +1,5 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
-from math import fabs
 import re
 from io import BytesIO
 
@@ -17,6 +16,7 @@ ILLEGAL_CHARACTERS_RE = re.compile(r'[\000-\010]|[\013-\014]|[\016-\037]')
 # return xlsx file object
 def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 	column_widths = column_widths or []
+	flag = False if column_widths else True 
 	xlsx_file = BytesIO()
 	if wb is None:
 		wb = wkb(xlsx_file)
@@ -39,19 +39,15 @@ def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 				value = re.sub(ILLEGAL_CHARACTERS_RE, '', value)
 
 			ws.write(idr, row.index(item), value)
-			try:
-				column_widths[row.index(item)]
-				if column_widths[row.index(item)] < len(str(value)):
-						column_widths[row.index(item)] = len(str(value))
-			except:
-				column_widths.append(len(str(value)))
-		
+			if flag:
+				get_column_widths(column_widths,row.index(item),str(value))
+			
 		idr+=1
 
-	for i, column_width in enumerate(column_widths):
-		if column_width > 0:
-			ws.set_column(i, i, column_width)
-
+	if column_widths:
+		 for i, column_width in enumerate(column_widths):
+				if column_width > 0:
+					ws.set_column(i, i, column_width)
 	wb.close()
 	return xlsx_file
 
@@ -123,3 +119,12 @@ def build_xlsx_response(data, filename):
 	frappe.response['filecontent'] = xlsx_file.getvalue()
 	frappe.response['type'] = 'binary'
 	
+def get_column_widths(column_widths,idc,val):
+	try:
+		column_widths[idc]
+		if column_widths[idc] < len(val):
+				column_widths[idc] = len(val)
+	except:
+		column_widths.append(len(val))
+
+	return column_widths
