@@ -80,7 +80,7 @@ def get_controller(doctype):
 	return site_controllers[doctype]
 
 class BaseDocument(object):
-	ignore_in_setter = ("doctype", "_meta", "meta", "_table_fields", "_valid_columns")
+	ignore_in_setter = {"doctype", "_meta", "meta", "_table_fields", "_valid_columns"}
 
 	def __init__(self, d):
 		if d.get("doctype"):
@@ -171,6 +171,12 @@ class BaseDocument(object):
 		if isinstance(value, list) and not as_value:
 			self.__dict__[key] = []
 			self.extend(key, value)
+			return
+
+		# Did you mean empty list?
+		if value is None and key in self.table_fieldnames:
+			value = []
+
 		else:
 			self.__dict__[key] = value
 
@@ -269,6 +275,14 @@ class BaseDocument(object):
 
 		return self.meta.get_table_fields()
 
+	@property
+	def table_fieldnames(self):
+		"""Returns a set of fieldnames from table fields."""
+		if not hasattr(self, "_table_fieldnames"):
+			self._table_fieldnames = {df.fieldname for df in self._get_table_fields()}
+
+		return self._table_fieldnames
+
 	def get_valid_dict(self, sanitize=True, convert_dates_to_str=False, ignore_nulls=False, ignore_virtual=False):
 		d = _dict()
 		for fieldname in self.meta.get_valid_columns():
@@ -337,9 +351,9 @@ class BaseDocument(object):
 		without worrying about whether or not they have values
 		"""
 
-		for df in self._get_table_fields():
-			if self.__dict__.get(df.fieldname) is None:
-				self.__dict__[df.fieldname] = []
+		for fieldname in self.table_fieldnames:
+			if self.__dict__.get(fieldname) is None:
+				self.__dict__[fieldname] = []
 
 	def init_valid_columns(self):
 		for key in default_fields:
@@ -383,9 +397,9 @@ class BaseDocument(object):
 		doc = self.get_valid_dict(convert_dates_to_str=convert_dates_to_str)
 		doc["doctype"] = self.doctype
 
-		for df in self.meta.get_table_fields():
-			children = self.get(df.fieldname) or []
-			doc[df.fieldname] = [
+		for fieldname in self.table_fieldnames:
+			children = self.get(fieldname) or []
+			doc[fieldname] = [
 				d.as_dict(
 					convert_dates_to_str=convert_dates_to_str,
 					no_nulls=no_nulls,
@@ -523,8 +537,8 @@ class BaseDocument(object):
 		"""Raw update parent + children
 		DOES NOT VALIDATE AND CALL TRIGGERS"""
 		self.db_update()
-		for df in self.meta.get_table_fields():
-			for doc in self.get(df.fieldname):
+		for fieldname in self.table_fieldnames:
+			for doc in self.get(fieldname):
 				doc.db_update()
 
 	def show_unique_validation_message(self, e):
