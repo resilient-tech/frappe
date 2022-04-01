@@ -769,24 +769,17 @@ def sbool(x: str) -> Union[bool, Any]:
 
 def rounded(num, precision=0):
 	"""round method for round halfs to nearest even algorithm aka banker's rounding - compatible with python3"""
+
+	if not precision:
+		return round(num)
+
+	# use multiplier to avoid rounding errors
+	# round(1.15) gives 1.1 instead of 1.2, rounded works fine
+
 	precision = cint(precision)
 	multiplier = 10 ** precision
 
-	# avoid rounding errors
-	num = round(num * multiplier if precision else num, 8)
-
-	floor_num = math.floor(num)
-	decimal_part = num - floor_num
-
-	if not precision and decimal_part == 0.5:
-		num = floor_num if (floor_num % 2 == 0) else floor_num + 1
-	else:
-		if decimal_part == 0.5:
-			num = floor_num + 1
-		else:
-			num = round(num)
-
-	return (num / multiplier) if precision else num
+	return round(num * multiplier) / multiplier
 
 def remainder(numerator, denominator, precision=2):
 	precision = cint(precision)
