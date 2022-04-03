@@ -859,10 +859,15 @@ def validate_fields(meta):
 		validate_column_name(fieldname)
 
 	def check_invalid_fieldnames(docname, fieldname):
-		invalid_fields = ('doctype',)
-		if fieldname in invalid_fields:
-			frappe.throw(_("{0}: Fieldname cannot be one of {1}")
-				.format(docname, ", ".join(frappe.bold(d) for d in invalid_fields)))
+		if fieldname in Document._ignore_in_setter:
+			frappe.throw(
+				_("{0}: fieldname cannot be one of:<br> {1}")
+				.format(
+					frappe.bold(docname),
+					", ".join(frappe.bold(d) for d in Document._ignore_in_setter),
+				),
+				title=_("Invalid Fieldname"),
+			)
 
 	def check_unique_fieldname(docname, fieldname):
 		duplicates = list(filter(None, map(lambda df: df.fieldname==fieldname and str(df.idx) or None, fields)))

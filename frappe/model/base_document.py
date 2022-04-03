@@ -3,7 +3,7 @@
 import datetime
 
 import frappe
-from frappe import _
+from frappe import _, _dict
 from frappe.model import child_table_fields, default_fields, display_fieldtypes, table_fields
 from frappe.model.naming import set_new_name
 from frappe.model.utils.link_count import notify_link_count
@@ -18,7 +18,15 @@ max_positive_value = {
 	'bigint': 2 ** 63
 }
 
-DOCTYPES_FOR_DOCTYPE = ('DocType', 'DocField', 'DocPerm', 'DocType Action', 'DocType Link')
+DOCTYPES_FOR_DOCTYPE = {'DocType', 'DocField', 'DocPerm', 'DocType Action', 'DocType Link'}
+
+DOCTYPE_TABLE_FIELDS = [
+	_dict(fieldname="fields", options="DocField"),
+	_dict(fieldname="permissions", options="DocPerm"),
+	_dict(fieldname="actions", options="DocType Action"),
+	_dict(fieldname="links", options="DocType Link"),
+	_dict(fieldname="states", options="DocType State"),
+]
 
 
 def get_controller(doctype):
@@ -72,11 +80,27 @@ def get_controller(doctype):
 	return site_controllers[doctype]
 
 class BaseDocument(object):
-	ignore_in_setter = ("doctype", "_meta", "meta", "_table_fields", "_valid_columns")
+	_ignore_in_setter = {
+		"doctype",
+		"_meta",
+		"meta",
+		"_table_fields",
+		"_valid_columns",
+		"_ignore_in_setter",
+		"_table_fieldnames",
+		"dont_update_if_missing",
+		"flags",
+	}
 
 	def __init__(self, d):
 		if d.get("doctype"):
 			self.doctype = d["doctype"]
+
+		self._table_fieldnames = (
+			d["_table_fieldnames"] # from cache
+			if "_table_fieldnames" in d
+			else {df.fieldname for df in self._get_table_fields()}
+		)
 
 		self.update(d)
 		self.dont_update_if_missing = []
@@ -146,12 +170,6 @@ class BaseDocument(object):
 		else:
 			value = self.__dict__.get(key, default)
 
-		if value is None and key in (
-			d.fieldname for d in self.meta.get_table_fields()
-		):
-			value = []
-			self.set(key, value)
-
 		if limit and isinstance(value, (list, tuple)) and len(value) > limit:
 			value = value[:limit]
 
@@ -161,14 +179,20 @@ class BaseDocument(object):
 		return self.get(key, filters=filters, limit=1)[0]
 
 	def set(self, key, value, as_value=False):
-		if key in self.ignore_in_setter:
+		if key in self._ignore_in_setter:
 			return
 
-		if isinstance(value, list) and not as_value:
-			self.__dict__[key] = []
-			self.extend(key, value)
-		else:
-			self.__dict__[key] = value
+		if not as_value:
+			if isinstance(value, list):
+				self.__dict__[key] = []
+				self.extend(key, value)
+				return
+
+			# Did you mean empty list?
+			if value is None and key in self._table_fieldnames:
+				value = []
+
+		self.__dict__[key] = value
 
 	def delete_key(self, key):
 		if key in self.__dict__:
@@ -185,9 +209,10 @@ class BaseDocument(object):
 			})
 		"""
 		if value is None:
-			value={}
+			value = {}
+
 		if isinstance(value, (dict, BaseDocument)):
-			if not self.__dict__.get(key):
+			if self.__dict__.get(key) is None:
 				self.__dict__[key] = []
 
 			value = self._init_child(value, key)
@@ -197,8 +222,8 @@ class BaseDocument(object):
 			value.parent_doc = self
 
 			return value
-		else:
 
+		else:
 			# metaclasses may have arbitrary lists
 			# which we can ignore
 			if (getattr(self, '_metaclass', None)
@@ -250,8 +275,23 @@ class BaseDocument(object):
 
 		return value
 
+	def _get_table_fields(self):
+		"""
+		To get table fields during Document init
+		Meta.get_table_fields goes into recursion for special doctypes
+		"""
+
+		if self.doctype == "DocType":
+			return DOCTYPE_TABLE_FIELDS
+
+		# child tables don't have child tables
+		if self.doctype in DOCTYPES_FOR_DOCTYPE:
+			return ()
+
+		return self.meta.get_table_fields()
+
 	def get_valid_dict(self, sanitize=True, convert_dates_to_str=False, ignore_nulls=False, ignore_virtual=False):
-		d = frappe._dict()
+		d = _dict()
 		for fieldname in self.meta.get_valid_columns():
 			d[fieldname] = self.get(fieldname)
 
@@ -311,6 +351,16 @@ class BaseDocument(object):
 				del d[fieldname]
 
 		return d
+
+	def init_child_tables(self):
+		"""
+		This is needed so that one can loop over child table properties
+		without worrying about whether or not they have values
+		"""
+
+		for fieldname in self._table_fieldnames:
+			if self.__dict__.get(fieldname) is None:
+				self.__dict__[fieldname] = []
 
 	def init_valid_columns(self):
 		for key in default_fields:
@@ -596,7 +646,7 @@ class BaseDocument(object):
 		if self.meta.istable:
 			for fieldname in ("parent", "parenttype"):
 				if not self.get(fieldname):
-					missing.append((fieldname, get_msg(frappe._dict(label=fieldname))))
+					missing.append((fieldname, get_msg(_dict(label=fieldname))))
 
 		return missing
 
@@ -641,7 +691,7 @@ class BaseDocument(object):
 				if not frappe.get_meta(doctype).get('is_virtual'):
 					if not fields_to_fetch:
 						# cache a single value type
-						values = frappe._dict(name=frappe.db.get_value(doctype, docname,
+						values = _dict(name=frappe.db.get_value(doctype, docname,
 							'name', cache=True))
 					else:
 						values_to_fetch = ['name'] + [_df.fetch_from.split('.')[-1]
@@ -943,10 +993,10 @@ class BaseDocument(object):
 		cache_key = parentfield or "main"
 
 		if not hasattr(self, "_precision"):
-			self._precision = frappe._dict()
+			self._precision = _dict()
 
 		if cache_key not in self._precision:
-			self._precision[cache_key] = frappe._dict()
+			self._precision[cache_key] = _dict()
 
 		if fieldname not in self._precision[cache_key]:
 			self._precision[cache_key][fieldname] = None
