@@ -170,6 +170,10 @@ class BaseDocument(object):
 
 		value = self.__dict__.get(key, default)
 
+		if value is None and value in self._table_fieldnames:
+			value = []
+			self.__dict__[key] = value
+
 		if limit and isinstance(value, (list, tuple)) and len(value) > limit:
 			value = value[:limit]
 
@@ -182,15 +186,10 @@ class BaseDocument(object):
 		if key in self._ignore_in_setter:
 			return
 
-		if not as_value:
-			if isinstance(value, list):
-				self.__dict__[key] = []
-				self.extend(key, value)
-				return
-
-			# Did you mean empty list?
-			if value is None and key in self._table_fieldnames:
-				value = []
+		if not as_value and isinstance(value, list):
+			self.__dict__[key] = []
+			self.extend(key, value)
+			return
 
 		self.__dict__[key] = value
 
