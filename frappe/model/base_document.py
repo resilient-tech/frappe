@@ -110,10 +110,10 @@ class BaseDocument(object):
 
 	@property
 	def meta(self):
-		if not getattr(self, "_meta", None):
-			self._meta = frappe.get_meta(self.doctype)
+		if not (meta := getattr(self, "_meta", None)):
+			self._meta = meta = frappe.get_meta(self.doctype)
 
-		return self._meta
+		return meta
 
 	def __getstate__(self):
 		self._meta = None
@@ -285,7 +285,7 @@ class BaseDocument(object):
 			return DOCTYPE_TABLE_FIELDS
 
 		# child tables don't have child tables
-		if self.doctype in DOCTYPES_FOR_DOCTYPE:
+		if self.doctype in DOCTYPES_FOR_DOCTYPE or getattr(self, "parenttype", None):
 			return ()
 
 		return self.meta.get_table_fields()
