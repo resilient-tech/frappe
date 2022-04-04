@@ -285,7 +285,7 @@ class BaseDocument(object):
 			return DOCTYPE_TABLE_FIELDS
 
 		# child tables don't have child tables
-		if self.doctype in DOCTYPES_FOR_DOCTYPE or getattr(self, "parenttype", None):
+		if self.doctype in DOCTYPES_FOR_DOCTYPE or getattr(self, "parentfield", None):
 			return ()
 
 		return self.meta.get_table_fields()
