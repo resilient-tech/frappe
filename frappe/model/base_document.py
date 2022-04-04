@@ -404,9 +404,9 @@ class BaseDocument(object):
 		doc = self.get_valid_dict(convert_dates_to_str=convert_dates_to_str)
 		doc["doctype"] = self.doctype
 
-		for df in self.meta.get_table_fields():
-			children = self.get(df.fieldname) or []
-			doc[df.fieldname] = [
+		for fieldname in self._table_fieldnames:
+			children = self.get(fieldname) or []
+			doc[fieldname] = [
 				d.as_dict(
 					convert_dates_to_str=convert_dates_to_str,
 					no_nulls=no_nulls,
@@ -544,8 +544,8 @@ class BaseDocument(object):
 		"""Raw update parent + children
 		DOES NOT VALIDATE AND CALL TRIGGERS"""
 		self.db_update()
-		for df in self.meta.get_table_fields():
-			for doc in self.get(df.fieldname):
+		for fieldname in self._table_fieldnames:
+			for doc in self.get(fieldname):
 				doc.db_update()
 
 	def show_unique_validation_message(self, e):
