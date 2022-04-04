@@ -162,13 +162,13 @@ class BaseDocument(object):
 
 		if filters:
 			if isinstance(filters, dict):
-				value = _filter(self.__dict__.get(key, []), filters, limit=limit)
-			else:
-				default = filters
-				filters = None
-				value = self.__dict__.get(key, default)
-		else:
-			value = self.__dict__.get(key, default)
+				return _filter(self.__dict__.get(key, []), filters, limit=limit)
+
+			# perhaps you wanted to set a default instead
+			default = filters
+			filters = None
+
+		value = self.__dict__.get(key, default)
 
 		if limit and isinstance(value, (list, tuple)) and len(value) > limit:
 			value = value[:limit]
