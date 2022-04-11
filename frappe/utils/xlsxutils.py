@@ -16,7 +16,7 @@ ILLEGAL_CHARACTERS_RE = re.compile(r'[\000-\010]|[\013-\014]|[\016-\037]')
 # return xlsx file object
 def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 	column_widths = column_widths or []
-	flag = False if column_widths else True 
+	flag = False if column_widths else True
 	xlsx_file = BytesIO()
 	if wb is None:
 		wb = wkb(xlsx_file)
@@ -40,8 +40,8 @@ def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 
 			ws.write(idr, row.index(item), value)
 			if flag:
-				get_column_widths(column_widths,row.index(item),str(value))
-			
+				column_widths = get_column_widths(column_widths,row.index(item),str(value))
+
 		idr+=1
 
 	if column_widths:
@@ -93,7 +93,7 @@ def read_xlsx_file_from_attached_file(file_url=None, fcontent=None, filepath=Non
 
 	rows = []
 	wb1 = pylightxl.readxl(fn=filename)
-	ws1 = wb1.ws(wb1.ws_names[0])#migt not be the active one || search on the net man.
+	ws1 = wb1.ws(wb1.ws_names[0])
 	for row in ws1.rows:
 		tmp_list = []
 		for cell in row:
@@ -118,7 +118,7 @@ def build_xlsx_response(data, filename):
 	frappe.response['filename'] = filename + '.xlsx'
 	frappe.response['filecontent'] = xlsx_file.getvalue()
 	frappe.response['type'] = 'binary'
-	
+
 def get_column_widths(column_widths,idc,val):
 	try:
 		column_widths[idc]
