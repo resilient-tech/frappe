@@ -451,7 +451,14 @@ class Meta(Document):
 				self.set(fieldname, new_list)
 
 	def sort_fields(self):
-		"""sort on basis of insert_after"""
+		"""
+		sort fields based on following data (in order of priority)
+
+		1. `field_order` property setter
+		2. `insert_after` property
+		3. `idx` (found in standard fields)
+		"""
+
 		custom_fields = sorted(self.get_custom_fields(), key=lambda df: df.idx)
 
 		if custom_fields:
