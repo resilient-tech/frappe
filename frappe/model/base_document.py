@@ -106,7 +106,7 @@ class BaseDocument:
 			else {df.fieldname for df in self._get_table_fields()}
 		)
 
-		self.update(d)
+		self.update(d, ignore_children=self.meta.istable)
 		self.dont_update_if_missing = []
 
 		if hasattr(self, "__setup__"):
@@ -138,7 +138,7 @@ class BaseDocument:
 
 		state.pop("_meta", None)
 
-	def update(self, d):
+	def update(self, d, *, ignore_children=False):
 		"""Update multiple fields of a doctype using a dictionary of key-value pairs.
 
 		Example:
@@ -153,6 +153,9 @@ class BaseDocument:
 			self.name = d["name"]
 
 		for key, value in d.items():
+			if ignore_children and key in self._table_fieldnames:
+				continue
+
 			self.set(key, value)
 
 		return self
