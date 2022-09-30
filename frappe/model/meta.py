@@ -130,6 +130,7 @@ class Meta(Document):
 		except frappe.DoesNotExistError:
 			if self.doctype == "DocType" and self.name in self.special_doctypes:
 				self.__dict__.update(load_doctype_from_file(self.name))
+				self.init_valid_columns()
 			else:
 				raise
 

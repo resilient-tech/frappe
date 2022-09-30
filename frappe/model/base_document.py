@@ -375,7 +375,7 @@ class BaseDocument:
 				elif key == "idx":
 					self.__dict__[key] = 0
 
-		for key in self.get_valid_columns():
+		for key in BaseDocument.get_valid_columns(self):
 			if key not in self.__dict__:
 				self.__dict__[key] = None
 
