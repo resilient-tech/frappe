@@ -89,23 +89,22 @@ frappe.ui.form.ControlLink = class ControlLink extends frappe.ui.form.ControlDat
 	is_translatable() {
 		return in_list(frappe.boot?.translated_doctypes || [], this.get_options());
 	}
-	set_link_title(value) {
-		let doctype = this.get_options();
+	is_title_link() {
+		return in_list(frappe.boot.link_title_doctypes, this.get_options());
+	}
+	async set_link_title(value) {
+		const doctype = this.get_options();
 
-		if (!doctype) return;
-
-		if (in_list(frappe.boot.link_title_doctypes, doctype)) {
-			let link_title = frappe.utils.get_link_title(doctype, value);
-			if (!link_title) {
-				link_title = frappe.utils.fetch_link_title(doctype, value).then((link_title) => {
-					this.translate_and_set_input_value(link_title, value);
-				});
-			} else {
-				this.translate_and_set_input_value(link_title, value);
-			}
-		} else {
+		if (!doctype || !this.is_title_link()) {
 			this.translate_and_set_input_value(value, value);
+			return;
 		}
+
+		const link_title =
+			frappe.utils.get_link_title(doctype, value) ||
+			(await frappe.utils.fetch_link_title(doctype, value));
+
+		this.translate_and_set_input_value(link_title, value);
 	}
 	translate_and_set_input_value(link_title, value) {
 		let translated_link_text = this.get_translated(link_title);
@@ -170,7 +169,7 @@ frappe.ui.form.ControlLink = class ControlLink extends frappe.ui.form.ControlDat
 		frappe.route_options.name_field = this.get_label_value();
 
 		// reference to calling link
-		frappe._from_link = this;
+		frappe._from_link = frappe.utils.deep_clone(this);
 		frappe._from_link_scrollY = $(document).scrollTop();
 
 		frappe.ui.form.make_quick_entry(doctype, (doc) => {
@@ -211,7 +210,12 @@ frappe.ui.form.ControlLink = class ControlLink extends frappe.ui.form.ControlDat
 
 				let _label = me.get_translated(d.label);
 				let html = d.html || "<strong>" + _label + "</strong>";
-				if (d.description && d.value !== d.description) {
+				if (
+					d.description &&
+					// for title links, we want to inlude the value in the description
+					// because it will not visible otherwise
+					(me.is_title_link() || d.value !== d.description)
+				) {
 					html += '<br><span class="small">' + __(d.description) + "</span>";
 				}
 				return $("<li></li>")

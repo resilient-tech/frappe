@@ -819,9 +819,16 @@ def run_tests(
 @click.option("--total-builds", help="Total number of builds", default=1)
 @click.option("--with-coverage", is_flag=True, help="Build coverage file")
 @click.option("--use-orchestrator", is_flag=True, help="Use orchestrator to run parallel tests")
+@click.option("--dry-run", is_flag=True, default=False, help="Dont actually run tests")
 @pass_context
 def run_parallel_tests(
-	context, app, build_number, total_builds, with_coverage=False, use_orchestrator=False
+	context,
+	app,
+	build_number,
+	total_builds,
+	with_coverage=False,
+	use_orchestrator=False,
+	dry_run=False,
 ):
 	from traceback_with_variables import activate_by_import
 
@@ -834,7 +841,13 @@ def run_parallel_tests(
 		else:
 			from frappe.parallel_test_runner import ParallelTestRunner
 
-			ParallelTestRunner(app, site=site, build_number=build_number, total_builds=total_builds)
+			ParallelTestRunner(
+				app,
+				site=site,
+				build_number=build_number,
+				total_builds=total_builds,
+				dry_run=dry_run,
+			)
 
 
 @click.command(
@@ -874,7 +887,6 @@ def run_ui_tests(
 
 	node_bin = subprocess.getoutput("npm bin")
 	cypress_path = f"{node_bin}/cypress"
-	plugin_path = f"{node_bin}/../cypress-file-upload"
 	drag_drop_plugin_path = f"{node_bin}/../@4tw/cypress-drag-drop"
 	real_events_plugin_path = f"{node_bin}/../cypress-real-events"
 	testing_library_path = f"{node_bin}/../@testing-library"
@@ -883,7 +895,6 @@ def run_ui_tests(
 	# check if cypress in path...if not, install it.
 	if not (
 		os.path.exists(cypress_path)
-		and os.path.exists(plugin_path)
 		and os.path.exists(drag_drop_plugin_path)
 		and os.path.exists(real_events_plugin_path)
 		and os.path.exists(testing_library_path)
@@ -893,11 +904,11 @@ def run_ui_tests(
 		click.secho("Installing Cypress...", fg="yellow")
 		packages = " ".join(
 			[
-				"cypress@^6",
-				"cypress-file-upload@^5",
+				"cypress@^10",
 				"@4tw/cypress-drag-drop@^2",
 				"cypress-real-events",
 				"@testing-library/cypress@^8",
+				"@testing-library/dom@8.17.1",
 				"@cypress/code-coverage@^3",
 			]
 		)

@@ -84,7 +84,6 @@ jobs:
       - name: Add to Hosts
         run: |
           echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
-          echo "127.0.0.1 test_site_producer" | sudo tee -a /etc/hosts
 
       - name: Cache pip
         uses: actions/cache@v3
@@ -122,7 +121,8 @@ jobs:
         env:
           SITE: test_site
           CI_BUILD_ID: ${{ github.run_id }}
-          ORCHESTRATOR_URL: http://test-orchestrator.frappe.io
+          BUILD_NUMBER: ${{ matrix.container }}
+          TOTAL_BUILDS: 2
 
       - name: Upload coverage data
         uses: actions/upload-artifact@v3

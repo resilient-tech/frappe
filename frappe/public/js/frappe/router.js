@@ -190,12 +190,8 @@ frappe.router = {
 		} else {
 			route = ["List", doctype_route.doctype, "List"];
 		}
-
-		if (doctype_route.doctype_layout) {
-			// set the layout
-			this.doctype_layout = doctype_route.doctype_layout;
-		}
-
+		// reset the layout to avoid using incorrect views
+		this.doctype_layout = doctype_route.doctype_layout;
 		return route;
 	},
 
@@ -369,12 +365,7 @@ frappe.router = {
 				frappe.route_options = a;
 				return null;
 			} else {
-				a = String(a);
-				if (a && a.match(/[%'"#\s\t]/)) {
-					// if special chars, then encode
-					a = encodeURIComponent(a);
-				}
-				return a;
+				return encodeURIComponent(String(a));
 			}
 		}).join("/");
 		let private_home = frappe.workspaces[`home-${frappe.user.name.toLowerCase()}`];

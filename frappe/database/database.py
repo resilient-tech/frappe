@@ -28,7 +28,6 @@ from frappe.database.utils import (
 from frappe.exceptions import DoesNotExistError, ImplicitCommitError
 from frappe.model.utils.link_count import flush_local_link_count
 from frappe.query_builder.functions import Count
-from frappe.query_builder.utils import DocType
 from frappe.utils import cast as cast_fieldtype
 from frappe.utils import get_datetime, get_table_name, getdate, now, sbool
 
@@ -83,14 +82,12 @@ class Database:
 		ac_name=None,
 		use_default=0,
 		port=None,
-		read_only=False,
 	):
 		self.setup_type_map()
 		self.host = host or frappe.conf.db_host or "127.0.0.1"
 		self.port = port or frappe.conf.db_port or ""
 		self.user = user or frappe.conf.db_name
 		self.db_name = frappe.conf.db_name
-		self.read_only = read_only  # Uses READ ONLY connection if set
 		self._conn = None
 
 		if ac_name:
@@ -220,6 +217,15 @@ class Database:
 
 			elif self.is_timedout(e):
 				raise frappe.QueryTimeoutError(e) from e
+
+			elif self.is_read_only_mode_error(e):
+				frappe.throw(
+					_(
+						"Site is running in read only mode, this action can not be performed right now. Please try again later."
+					),
+					title=_("In Read Only Mode"),
+					exc=frappe.InReadOnlyMode,
+				)
 
 			# TODO: added temporarily
 			elif self.db_type == "postgres":
@@ -851,7 +857,7 @@ class Database:
 		:param modified_by: Set this user as `modified_by`.
 		:param update_modified: default True. Set as false, if you don't want to update the timestamp.
 		:param debug: Print the query in the developer / js console.
-		:param for_update: Will add a row-level lock to the value that is being set so that it can be released on commit.
+		:param for_update: [DEPRECATED] This function now performs updates in single query, locking is not required.
 		"""
 		is_single_doctype = not (dn and dt != dn)
 		to_update = field if isinstance(field, dict) else {field: val}
@@ -873,19 +879,11 @@ class Database:
 			frappe.clear_document_cache(dt, dt)
 
 		else:
-			table = DocType(dt)
+			query = frappe.qb.engine.build_conditions(table=dt, filters=dn, update=True)
 
-			if for_update:
-				docnames = tuple(
-					self.get_values(dt, dn, "name", debug=debug, for_update=for_update, pluck=True)
-				) or (NullValue(),)
-				query = frappe.qb.update(table).where(table.name.isin(docnames))
-
-				for docname in docnames:
-					frappe.clear_document_cache(dt, docname)
-
+			if isinstance(dn, str):
+				frappe.clear_document_cache(dt, dn)
 			else:
-				query = frappe.qb.engine.build_conditions(table=dt, filters=dn, update=True)
 				# TODO: Fix this; doesn't work rn - gavin@frappe.io
 				# frappe.cache().hdel_keys(dt, "document_cache")
 				# Workaround: clear all document caches
@@ -958,8 +956,10 @@ class Database:
 
 		return defaults.get(frappe.scrub(key))
 
-	def begin(self):
-		self.sql("START TRANSACTION")
+	def begin(self, *, read_only=False):
+		read_only = read_only or frappe.flags.read_only
+		mode = "READ ONLY" if read_only else ""
+		self.sql(f"START TRANSACTION {mode}")
 
 	def commit(self):
 		"""Commit current transaction. Calls SQL `COMMIT`."""
@@ -967,9 +967,7 @@ class Database:
 			frappe.call(method[0], *(method[1] or []), **(method[2] or {}))
 
 		self.sql("commit")
-		if self.db_type == "postgres":
-			# Postgres requires explicitly starting new transaction
-			self.begin()
+		self.begin()  # explicitly start a new transaction
 
 		frappe.local.rollback_observers = []
 		self.flush_realtime_log()
@@ -1300,12 +1298,23 @@ class Database:
 
 
 def enqueue_jobs_after_commit():
-	from frappe.utils.background_jobs import execute_job, get_queue
+	from frappe.utils.background_jobs import (
+		RQ_JOB_FAILURE_TTL,
+		RQ_RESULTS_TTL,
+		execute_job,
+		get_queue,
+	)
 
 	if frappe.flags.enqueue_after_commit and len(frappe.flags.enqueue_after_commit) > 0:
 		for job in frappe.flags.enqueue_after_commit:
 			q = get_queue(job.get("queue"), is_async=job.get("is_async"))
-			q.enqueue_call(execute_job, timeout=job.get("timeout"), kwargs=job.get("queue_args"))
+			q.enqueue_call(
+				execute_job,
+				timeout=job.get("timeout"),
+				kwargs=job.get("queue_args"),
+				failure_ttl=RQ_JOB_FAILURE_TTL,
+				result_ttl=RQ_RESULTS_TTL,
+			)
 		frappe.flags.enqueue_after_commit = []
 
 
