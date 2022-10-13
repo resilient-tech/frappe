@@ -42,6 +42,10 @@ class CustomField(Document):
 		from frappe.core.doctype.doctype.doctype import check_fieldname_conflicts
 		from frappe.custom.doctype.customize_form.customize_form import CustomizeForm
 
+		# cannot edit system generated custom fields
+		if frappe.request and self.is_system_generated:
+			frappe.throw(_("System generated fields can't be edited."))
+
 		# don't always get meta to improve performance
 		# setting idx is just an improvement, not a requirement
 		if self.is_new() or self.insert_after == "append":
@@ -78,7 +82,6 @@ class CustomField(Document):
 			self.translatable = 0
 
 		check_fieldname_conflicts(self)
-		self.validate_system_generate_fields()
 
 	def on_update(self):
 		# validate field
@@ -130,12 +133,6 @@ class CustomField(Document):
 
 		if self.fieldname == self.insert_after:
 			frappe.throw(_("Insert After cannot be set as {0}").format(meta.get_label(self.insert_after)))
-
-	def validate_system_generate_fields(self):
-		"""Validate if system generated Custom Field is seleted."""
-
-		if self.is_system_generated:
-			frappe.throw(_("System generated fields can't be edited."))
 
 
 @frappe.whitelist()
