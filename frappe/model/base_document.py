@@ -366,19 +366,18 @@ class BaseDocument:
 				self.__dict__[fieldname] = []
 
 	def init_valid_columns(self):
-		for key in default_fields:
-			if key not in self.__dict__:
-				self.__dict__[key] = None
-
-			if self.__dict__[key] is None:
-				if key == "docstatus":
-					self.docstatus = DocStatus.draft()
-				elif key == "idx":
-					self.__dict__[key] = 0
+		attr_dict = self.__dict__
 
 		for key in self.get_valid_columns():
-			if key not in self.__dict__:
-				self.__dict__[key] = None
+			if key not in attr_dict:
+				attr_dict[key] = None
+
+		# init default values for default columns in all doctypes
+		if attr_dict.get("docstatus", False) is None:
+			attr_dict["docstatus"] = DocStatus.draft()
+
+		if attr_dict.get("idx", False) is None:
+			attr_dict["idx"] = 0
 
 	def get_valid_columns(self) -> list[str]:
 		if self.doctype not in frappe.local.valid_columns:
