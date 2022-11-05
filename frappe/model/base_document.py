@@ -947,13 +947,11 @@ class BaseDocument:
 			title=_("Value too big"),
 		)
 
-	def _validate_update_after_submit(self):
+	def _validate_update_after_submit(self, doc=None):
 		# get the full doc with children
-		db_values = frappe.get_doc(self.doctype, self.name).as_dict()
-
 		for key in self.as_dict():
 			df = self.meta.get_field(key)
-			db_value = db_values.get(key)
+			db_value = doc.get(key)
 
 			if df and not df.allow_on_submit and (self.get(key) or db_value):
 				if df.fieldtype in table_fields:
