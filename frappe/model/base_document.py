@@ -948,7 +948,6 @@ class BaseDocument:
 		)
 
 	def _validate_update_after_submit(self, previous_doc):
-		# get the full doc with children
 		for key in self.as_dict():
 			df = self.meta.get_field(key)
 			db_value = previous_doc.get(key)
