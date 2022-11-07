@@ -172,6 +172,7 @@ class TestDocument(FrappeTestCase):
 	def test_update_after_submit(self):
 		d = self.test_insert()
 		d.starts_on = "2014-09-09"
+		d.load_doc_before_save()
 		self.assertRaises(frappe.UpdateAfterSubmitError, d.validate_update_after_submit)
 		d.meta.get_field("starts_on").allow_on_submit = 1
 		d.validate_update_after_submit()

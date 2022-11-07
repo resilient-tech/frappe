@@ -947,11 +947,11 @@ class BaseDocument:
 			title=_("Value too big"),
 		)
 
-	def _validate_update_after_submit(self, doc=None):
+	def _validate_update_after_submit(self, previous_doc):
 		# get the full doc with children
 		for key in self.as_dict():
 			df = self.meta.get_field(key)
-			db_value = doc.get(key)
+			db_value = previous_doc.get(key)
 
 			if df and not df.allow_on_submit and (self.get(key) or db_value):
 				if df.fieldtype in table_fields:

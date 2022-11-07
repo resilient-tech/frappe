@@ -834,7 +834,7 @@ class Document(BaseDocument):
 				# in case of a new row, don't validate allow on submit, if table is allow on submit
 				continue
 
-			d._validate_update_after_submit(d.as_dict())
+			d._validate_update_after_submit(previous_doc)
 
 		# TODO check only allowed values are updated
 
