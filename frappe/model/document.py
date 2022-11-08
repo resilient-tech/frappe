@@ -824,17 +824,18 @@ class Document(BaseDocument):
 			return
 
 		previous_doc = self.get_doc_before_save().as_dict()
-		if not previous_doc:
-			frappe.throw(_("Doc not found"))
-
 		self._validate_update_after_submit(previous_doc)
+
+		# validate children
 		for d in self.get_all_children():
 			if d.is_new() and self.meta.get_field(d.parentfield).allow_on_submit:
 				# in case of a new row, don't validate allow on submit, if table is allow on submit
 				continue
 
-			for previous_d in previous_doc.get(d.parentfield):
-				d._validate_update_after_submit(previous_d)
+			previous_child = next(
+				(child for child in previous_doc.get(d.parentfield) if child.name == d.name), None
+			)
+			d._validate_update_after_submit(previous_child)
 
 		# TODO check only allowed values are updated
 

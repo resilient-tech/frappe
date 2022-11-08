@@ -1,5 +1,6 @@
 # Copyright (c) 2022, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
+import copy
 from contextlib import contextmanager
 from datetime import timedelta
 from unittest.mock import Mock, patch
@@ -65,11 +66,19 @@ class TestDocument(FrappeTestCase):
 				"subject": "test-doc-test-event 2",
 				"starts_on": "2014-01-01",
 				"event_type": "Public",
+				"event_participants": [
+					{
+						"reference_doctype": "User",
+						"reference_docname": "Administrator",
+					}
+				],
 			}
 		)
 		d.insert()
+
 		self.assertTrue(d.name.startswith("EV"))
 		self.assertEqual(frappe.db.get_value("Event", d.name, "subject"), "test-doc-test-event 2")
+		self.assertTrue(len(d.event_participants) >= 1)
 
 	def test_update(self):
 		d = self.test_insert()
@@ -171,17 +180,36 @@ class TestDocument(FrappeTestCase):
 
 	def test_update_after_submit(self):
 		d = self.test_insert()
+		d._doc_before_save = copy.copy(d)
 		d.starts_on = "2014-09-09"
-		d.load_doc_before_save()
 		self.assertRaises(frappe.UpdateAfterSubmitError, d.validate_update_after_submit)
 		d.meta.get_field("starts_on").allow_on_submit = 1
 		d.validate_update_after_submit()
+
+		# test for allow_on_submit on child table if new row is added
+		d.meta.is_submittable = 1
+		d.submit()
+		d.append(
+			"event_participants", {"reference_doctype": "User", "reference_docname": "Administrator"}
+		)
+		self.assertRaises(frappe.UpdateAfterSubmitError, d.validate_update_after_submit)
+
+		d.meta.get_field("event_participants").allow_on_submit = 1
+		d.save()
+
+		# test for existing row in child table
+		d.load_doc_before_save()
+		d.event_participants[0].reference_docname = "Guest"
+		self.assertRaises(frappe.UpdateAfterSubmitError, d.validate_update_after_submit)
+
+		d.meta.get_field("event_participants").allow_on_submit = 0
+		d.meta.is_submittable = 0
 		d.meta.get_field("starts_on").allow_on_submit = 0
 
 		# when comparing date(2014, 1, 1) and "2014-01-01"
 		d.reload()
 		d.starts_on = "2014-01-01"
-		d.validate_update_after_submit()
+		self.assertRaises(frappe.UpdateAfterSubmitError, d.validate_update_after_submit)
 
 	def test_varchar_length(self):
 		d = self.test_insert()
