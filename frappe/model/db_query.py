@@ -752,7 +752,7 @@ class DatabaseQuery:
 			if not self.shared:
 				frappe.throw(_("No permission to read {0}").format(_(self.doctype)), frappe.PermissionError)
 			else:
-				self.conditions.append(self.get_share_condition())
+				self.match_conditions.append(self.get_share_condition())
 
 		else:
 			# skip user perm check if owner constraint is required
