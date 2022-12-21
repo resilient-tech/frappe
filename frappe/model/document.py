@@ -983,19 +983,16 @@ class Document(BaseDocument):
 			elif alert.event == "Method" and method == alert.method:
 				_evaluate_alert(alert)
 
-	@whitelist.__func__
 	def _submit(self):
 		"""Submit the document. Sets `docstatus` = 1, then saves."""
 		self.docstatus = DocStatus.submitted()
 		return self.save()
 
-	@whitelist.__func__
 	def _cancel(self):
 		"""Cancel the document. Sets `docstatus` = 2, then saves."""
 		self.docstatus = DocStatus.cancelled()
 		return self.save()
 
-	@whitelist.__func__
 	def _rename(
 		self, name: str, merge: bool = False, force: bool = False, validate_rename: bool = True
 	):
@@ -1005,17 +1002,14 @@ class Document(BaseDocument):
 		self.name = rename_doc(doc=self, new=name, merge=merge, force=force, validate=validate_rename)
 		self.reload()
 
-	@whitelist.__func__
 	def submit(self):
 		"""Submit the document. Sets `docstatus` = 1, then saves."""
 		return self._submit()
 
-	@whitelist.__func__
 	def cancel(self):
 		"""Cancel the document. Sets `docstatus` = 2, then saves."""
 		return self._cancel()
 
-	@whitelist.__func__
 	def rename(
 		self, name: str, merge: bool = False, force: bool = False, validate_rename: bool = True
 	):
