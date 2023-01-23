@@ -58,11 +58,12 @@ class RedisWrapper(redis.Redis):
 		if not expires_in_sec and cache_locally:
 			frappe.local.cache[key] = val
 
+		value = pickle.dumps(val, protocol=pickle.HIGHEST_PROTOCOL)
 		try:
 			if expires_in_sec:
-				self.setex(name=key, time=expires_in_sec, value=pickle.dumps(val))
+				self.setex(name=key, time=expires_in_sec, value=value)
 			else:
-				self.set(key, pickle.dumps(val))
+				self.set(key, value)
 
 		except redis.exceptions.ConnectionError:
 			return None
@@ -184,7 +185,13 @@ class RedisWrapper(redis.Redis):
 
 		# set in redis
 		try:
-			super().hset(_name, key, pickle.dumps(value), *args, **kwargs)
+			super().hset(
+				_name,
+				key,
+				pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL),
+				*args,
+				**kwargs,
+			)
 		except redis.exceptions.ConnectionError:
 			pass
 
