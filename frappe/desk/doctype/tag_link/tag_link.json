@@ -46,7 +46,7 @@
   }
  ],
  "links": [],
- "modified": "2021-09-20 16:53:37.217998",
+ "modified": "2023-01-31 14:05:33.279013",
  "modified_by": "Administrator",
  "module": "Desk",
  "name": "Tag Link",
@@ -65,7 +65,6 @@
    "write": 1
   },
   {
-   "create": 1,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -79,5 +78,6 @@
  "read_only": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
