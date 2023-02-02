@@ -33,8 +33,7 @@ frappe.dom = {
 		document.getElementsByTagName("head")[0].appendChild(el);
 	},
 	remove_script_and_style: function (txt) {
-		let content = DOMPurify.sanitize(txt);
-		return content;
+		return DOMPurify.sanitize(txt);
 	},
 	is_element_in_viewport: function (el, tolerance = 0) {
 		//special bonus for those using jQuery
