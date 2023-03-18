@@ -174,7 +174,8 @@ class TestCustomizeForm(FrappeTestCase):
 
 		frappe.delete_doc("Custom Field", "Event-test_add_custom_field_via_customize_form")
 		self.assertEqual(
-			frappe.db.get_value("Custom Field", "Event-test_add_custom_field_via_customize_form"), None
+			frappe.db.get_value("Custom Field", "Event-test_add_custom_field_via_customize_form"),
+			None,
 		)
 
 	def test_save_customization_remove_field(self):
@@ -251,7 +252,11 @@ class TestCustomizeForm(FrappeTestCase):
 		self.assertEqual(
 			frappe.db.get_value(
 				"Property Setter",
-				{"doc_type": "Notification Log", "property": "length", "field_name": "document_name"},
+				{
+					"doc_type": "Notification Log",
+					"property": "length",
+					"field_name": "document_name",
+				},
 				"value",
 			),
 			"255",
@@ -404,6 +409,29 @@ class TestCustomizeForm(FrappeTestCase):
 
 		with self.assertRaises(frappe.ValidationError):
 			d.run_method("save_customization")
+
+	def test_system_generated_fields(self):
+		doctype = "Event"
+		custom_field_name = "test_custom_field"
+
+		custom_field = frappe.get_doc("Custom Field", {"dt": doctype, "fieldname": custom_field_name})
+		custom_field.is_system_generated = 1
+		custom_field.save()
+
+		d = self.get_customize_form(doctype)
+		custom_field = d.getone("fields", {"fieldname": custom_field_name})
+		custom_field.description = "Test Description"
+		d.run_method("save_customization")
+
+		property_setter_filters = {
+			"doc_type": doctype,
+			"field_name": custom_field_name,
+			"property": "description",
+		}
+		self.assertEqual(
+			frappe.db.get_value("Property Setter", property_setter_filters, "value"),
+			"Test Description",
+		)
 
 	def test_customized_field_order(self):
 		def shuffle_fields():
