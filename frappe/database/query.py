@@ -158,10 +158,9 @@ class Engine:
 			_field = frappe.qb.DocType(doctype)[field]
 
 		# apply implicit join if child table is referenced
-		if doctype and doctype != self.doctype:
-			meta = frappe.get_meta(doctype)
+		if doctype and doctype != self.doctype and frappe.is_table(doctype):
 			table = frappe.qb.DocType(doctype)
-			if meta.istable and not self.query.is_joined(table):
+			if not self.query.is_joined(table):
 				self.query = self.query.left_join(table).on(
 					(table.parent == self.table.name) & (table.parenttype == self.doctype)
 				)
