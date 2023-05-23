@@ -10,6 +10,7 @@ from pypika.queries import QueryBuilder, Table
 import frappe
 from frappe import _
 from frappe.database.operator_map import OPERATOR_MAP
+from frappe.database.schema import SPECIAL_CHAR_PATTERN
 from frappe.database.utils import DefaultOrderBy, get_doctype_name
 from frappe.query_builder import Criterion, Field, Order, functions
 from frappe.query_builder.functions import Function, SqlFunctions
@@ -146,14 +147,11 @@ class Engine:
 		_value = value
 		_operator = operator
 
+		if isinstance(field, str) and SPECIAL_CHAR_PATTERN.search(field):
+			frappe.throw(_("Invalid fieldname in filter: {0}").format(field))
+
 		if isinstance(_field, Field):
 			pass
-		elif dynamic_field := DynamicTableField.parse(field, self.doctype):
-			# apply implicit join if link field's field is referenced
-			self.query = dynamic_field.apply_join(self.query)
-			_field = dynamic_field.field
-		elif has_function(field):
-			_field = self.get_function_object(field)
 		elif not doctype or doctype == self.doctype:
 			_field = self.table[field]
 		elif doctype:
@@ -170,14 +168,12 @@ class Engine:
 
 		if isinstance(_value, (list, tuple)):
 			_operator, _value = _value
+
+			if not _value:
+				_value = ("",)
+
 		elif isinstance(_value, bool):
 			_value = int(_value)
-
-		if isinstance(_value, str) and has_function(_value):
-			_value = self.get_function_object(_value)
-
-		if isinstance(_value, (list, tuple)) and not _value:
-			_value = ("",)
 
 		# Nested set
 		if _operator in OPERATOR_MAP["nested_set"]:
