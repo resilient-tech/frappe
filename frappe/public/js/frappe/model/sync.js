@@ -124,11 +124,14 @@ Object.assign(frappe.model, {
 				if (!(local_doc[fieldname] instanceof Array)) {
 					local_doc[fieldname] = [];
 				}
-
+				let sort_flag = false;
 				// child table, override each row and append new rows if required
 				for (let i = 0; i < doc[fieldname].length; i++) {
 					let d = doc[fieldname][i];
-					let local_d = local_doc[fieldname][i];
+					let local_d;
+					if (locals[d.doctype]) local_d = locals[d.doctype][d.name];
+					else local_d = local_doc[fieldname][i];
+
 					if (local_d) {
 						// deleted and added again
 						if (!locals[d.doctype]) locals[d.doctype] = {};
@@ -148,6 +151,7 @@ Object.assign(frappe.model, {
 						}
 
 						// row exists, just copy the values
+						if (d.idx != local_d.idx) sort_flag = true;
 						Object.assign(local_d, d);
 						clear_keys(d, local_d);
 					} else {
@@ -156,7 +160,11 @@ Object.assign(frappe.model, {
 						frappe.model.add_to_locals(d);
 					}
 				}
-
+				if (sort_flag) {
+					local_doc[fieldname].sort((x, y) => {
+						return x.idx - y.idx;
+					});
+				}
 				// remove extra rows
 				if (local_doc[fieldname].length > doc[fieldname].length) {
 					for (let i = doc[fieldname].length; i < local_doc[fieldname].length; i++) {
