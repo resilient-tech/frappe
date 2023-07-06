@@ -43,14 +43,14 @@ def get_files_in_folder(folder: str, start: int = 0, page_length: int = 20) -> d
 	attachment_folder = frappe.db.get_value(
 		"File",
 		"Home/Attachments",
-		["name", "file_name", "file_url", "is_folder", "modified"],
+		["name", "file_name", "file_url", "is_folder", "modified", "is_private"],
 		as_dict=1,
 	)
 
 	files = frappe.get_list(
 		"File",
 		{"folder": folder},
-		["name", "file_name", "file_url", "is_folder", "modified"],
+		["name", "file_name", "file_url", "is_folder", "modified", "is_private"],
 		start=start,
 		page_length=page_length + 1,
 	)

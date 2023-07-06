@@ -164,7 +164,8 @@ function make_file_node(file) {
 		children_start: 0,
 		open: false,
 		fetching: false,
-		filtered: true
+		filtered: true,
+		is_private: file.is_private
 	};
 }
 

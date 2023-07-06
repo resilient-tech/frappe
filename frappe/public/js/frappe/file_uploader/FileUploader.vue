@@ -396,7 +396,8 @@ function upload_via_file_browser() {
 	}
 	close_dialog.value = true;
 	return upload_file({
-		file_url: selected_file.file_url
+		file_url: selected_file.file_url,
+		private: selected_file.is_private
 	});
 }
 function upload_via_web_link() {
