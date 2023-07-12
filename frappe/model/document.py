@@ -156,6 +156,9 @@ class Document(BaseDocument):
 			)
 
 			if not d:
+				if not frappe.has_permission(self.doctype):
+					self.raise_no_permission_to()
+
 				frappe.throw(
 					_("{0} {1} not found").format(_(self.doctype), self.name), frappe.DoesNotExistError
 				)
@@ -218,7 +221,7 @@ class Document(BaseDocument):
 
 		return frappe.permissions.has_permission(self.doctype, permtype, self)
 
-	def raise_no_permission_to(self, perm_type):
+	def raise_no_permission_to(self, perm_type=None):
 		"""Raise `frappe.PermissionError`."""
 		frappe.flags.error_message = _("Insufficient Permission for {0}").format(self.doctype)
 		raise frappe.PermissionError

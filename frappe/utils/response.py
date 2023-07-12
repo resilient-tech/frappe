@@ -42,8 +42,8 @@ def report_error(status_code):
 			frappe.errprint(traceback)
 			frappe.local.response.exception = traceback.splitlines()[-1]
 
+	frappe.response.http_status_code = status_code
 	response = build_response("json")
-	response.status_code = status_code
 	return response
 
 
@@ -100,11 +100,16 @@ def as_raw():
 
 
 def as_json():
-	make_logs()
 	response = Response()
-	if frappe.local.response.http_status_code:
-		response.status_code = frappe.local.response["http_status_code"]
+	http_status_code = frappe.local.response.http_status_code
+	if http_status_code:
+		response.status_code = http_status_code
 		del frappe.local.response["http_status_code"]
+
+	if http_status_code == 403:
+		frappe.response._error_message = frappe.flags.error_message
+	else:
+		make_logs()
 
 	response.mimetype = "application/json"
 	response.data = json.dumps(frappe.local.response, default=json_handler, separators=(",", ":"))
