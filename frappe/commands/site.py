@@ -591,8 +591,9 @@ def disable_user(context, email):
 @click.command("migrate")
 @click.option("--skip-failing", is_flag=True, help="Skip patches that fail to run")
 @click.option("--skip-search-index", is_flag=True, help="Skip search indexing for web documents")
+@click.option("--bypass-patch", multiple=True, help="Add patch to bypass")
 @pass_context
-def migrate(context, skip_failing=False, skip_search_index=False):
+def migrate(context, skip_failing=False, skip_search_index=False, bypass_patch=None):
 	"Run patches, sync schema and rebuild files/translations"
 	from traceback_with_variables import activate_by_import
 
@@ -604,6 +605,7 @@ def migrate(context, skip_failing=False, skip_search_index=False):
 			SiteMigration(
 				skip_failing=skip_failing,
 				skip_search_index=skip_search_index,
+				bypass_patch=bypass_patch
 			).run(site=site)
 		finally:
 			print()

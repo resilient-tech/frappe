@@ -62,9 +62,10 @@ class SiteMigration:
 	- run after migrate hooks
 	"""
 
-	def __init__(self, skip_failing: bool = False, skip_search_index: bool = False) -> None:
+	def __init__(self, skip_failing: bool = False, skip_search_index: bool = False, bypass_patch=None) -> None:
 		self.skip_failing = skip_failing
 		self.skip_search_index = skip_search_index
+		self.bypass_patch = bypass_patch
 
 	def setUp(self):
 		"""Complete setup required for site migration"""
@@ -108,11 +109,11 @@ class SiteMigration:
 	def run_schema_updates(self):
 		"""Run patches as defined in patches.txt, sync schema changes as defined in the {doctype}.json files"""
 		frappe.modules.patch_handler.run_all(
-			skip_failing=self.skip_failing, patch_type=PatchType.pre_model_sync
+			skip_failing=self.skip_failing, patch_type=PatchType.pre_model_sync, bypass_patch=self.bypass_patch
 		)
 		frappe.model.sync.sync_all()
 		frappe.modules.patch_handler.run_all(
-			skip_failing=self.skip_failing, patch_type=PatchType.post_model_sync
+			skip_failing=self.skip_failing, patch_type=PatchType.post_model_sync, bypass_patch=self.bypass_patch, 
 		)
 
 	@atomic

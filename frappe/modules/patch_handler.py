@@ -51,9 +51,10 @@ class PatchType(Enum):
 	post_model_sync = "post_model_sync"
 
 
-def run_all(skip_failing: bool = False, patch_type: PatchType | None = None) -> None:
+def run_all(skip_failing: bool = False, patch_type: PatchType | None = None, bypass_patch=None) -> None:
 	"""run all pending patches"""
 	executed = set(frappe.get_all("Patch Log", filters={"skipped": 0}, fields="patch", pluck="patch"))
+	executed.update(set(bypass_patch))
 
 	frappe.flags.final_patches = []
 
