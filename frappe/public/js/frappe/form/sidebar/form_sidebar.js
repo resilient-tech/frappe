@@ -273,16 +273,14 @@ frappe.ui.form.Sidebar = class {
 	refresh_image() {}
 
 	make_document_template() {
+		const document_template_wrapper = this.sidebar.find('.document-template-section');
+
 		var me = this;
 		if (this.frm.meta.hide_toolbar) return;
 
-		if (this.frm.doc.__islocal) {
-			me.sidebar.find(".form-template").toggle(true);
-		}
-
+		// document_template_wrapper.toggle(this.frm.doc.__islocal ? true : false);
 		this.form_template = new frappe.ui.form.DocumentTemplate({
-			wrapper: this.sidebar.find('.form-template'),
-			doctype: me.frm.doctype,
+			parent: document_template_wrapper,
 			frm: me.frm
 		});
 	}

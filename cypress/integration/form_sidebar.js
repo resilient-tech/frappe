@@ -10,7 +10,7 @@ context("Form Sidebar", () => {
 			.its('data')
 			.then(data => expect(data.length).to.be.at.least(1));
 
-		cy.get('.form-template > .sidebar-action > a').click();
+		cy.get('.document-template > .sidebar-action > a').click();
 		cy.get('[data-name="Test ToDo"]').should('be.visible');
 	}
 
