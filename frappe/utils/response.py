@@ -6,6 +6,7 @@ import decimal
 import json
 import mimetypes
 import os
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 import werkzeug.utils
@@ -22,12 +23,13 @@ from frappe import _
 from frappe.core.doctype.access_log.access_log import make_access_log
 from frappe.utils import cint, format_timedelta
 
+if TYPE_CHECKING:
+	from frappe.core.doctype.file.file import File
+
 
 def report_error(status_code):
 	"""Build error. Show traceback in developer mode"""
-	allow_traceback = (
-		cint(frappe.db.get_system_setting("allow_error_traceback")) if frappe.db else True
-	)
+	allow_traceback = frappe.get_system_settings("allow_error_traceback") if frappe.db else False
 	if (
 		allow_traceback
 		and (status_code != 404 or frappe.conf.logging)
@@ -64,7 +66,6 @@ def build_response(response_type=None):
 def as_csv():
 	response = Response()
 	response.mimetype = "text/csv"
-	response.charset = "utf-8"
 	response.headers["Content-Disposition"] = (
 		'attachment; filename="%s.csv"' % frappe.response["doctype"].replace(" ", "_")
 	).encode("utf-8")
@@ -75,7 +76,6 @@ def as_csv():
 def as_txt():
 	response = Response()
 	response.mimetype = "text"
-	response.charset = "utf-8"
 	response.headers["Content-Disposition"] = (
 		'attachment; filename="%s.txt"' % frappe.response["doctype"].replace(" ", "_")
 	).encode("utf-8")
@@ -92,7 +92,7 @@ def as_raw():
 	)
 	response.headers["Content-Disposition"] = (
 		f'{frappe.response.get("display_content_as","attachment")}; filename="{frappe.response["filename"].replace(" ", "_")}"'
-	).encode("utf-8")
+	).encode()
 	response.data = frappe.response["filecontent"]
 	return response
 
@@ -105,7 +105,6 @@ def as_json():
 		del frappe.local.response["http_status_code"]
 
 	response.mimetype = "application/json"
-	response.charset = "utf-8"
 	response.data = json.dumps(frappe.local.response, default=json_handler, separators=(",", ":"))
 	return response
 
@@ -134,10 +133,14 @@ def as_binary():
 
 def make_logs(response=None):
 	"""make strings for msgprint and errprint"""
+	from frappe.utils.error import guess_exception_source
+
 	if not response:
 		response = frappe.local.response
 
 	if frappe.error_log:
+		if source := guess_exception_source(frappe.local.error_log and frappe.local.error_log[0]["exc"]):
+			response["_exc_source"] = source
 		response["exc"] = json.dumps([frappe.utils.cstr(d["exc"]) for d in frappe.local.error_log])
 
 	if frappe.local.message_log:
@@ -155,6 +158,7 @@ def make_logs(response=None):
 def json_handler(obj):
 	"""serialize non-serializable data for json"""
 	from collections.abc import Iterable
+	from re import Match
 
 	if isinstance(obj, (datetime.date, datetime.datetime, datetime.time)):
 		return str(obj)
@@ -169,18 +173,22 @@ def json_handler(obj):
 		return str(obj)
 
 	elif isinstance(obj, frappe.model.document.BaseDocument):
-		doc = obj.as_dict(no_nulls=True)
-		return doc
-
+		return obj.as_dict(no_nulls=True)
 	elif isinstance(obj, Iterable):
 		return list(obj)
+
+	elif isinstance(obj, Match):
+		return obj.string
 
 	elif type(obj) == type or isinstance(obj, Exception):
 		return repr(obj)
 
+	elif callable(obj):
+		return repr(obj)
+
 	else:
 		raise TypeError(
-			"""Object of type %s with value of %s is not JSON serializable""" % (type(obj), repr(obj))
+			f"""Object of type {type(obj)} with value of {repr(obj)} is not JSON serializable"""
 		)
 
 
@@ -209,28 +217,26 @@ def download_backup(path):
 	return send_private_file(path)
 
 
-def download_private_file(path):
+def download_private_file(path: str) -> Response:
 	"""Checks permissions and sends back private file"""
 
-	files = frappe.db.get_all("File", {"file_url": path})
-	can_access = False
+	files = frappe.get_all("File", filters={"file_url": path}, fields="*")
 	# this file might be attached to multiple documents
 	# if the file is accessible from any one of those documents
 	# then it should be downloadable
-	for f in files:
-		_file = frappe.get_doc("File", f)
-		can_access = _file.is_downloadable()
-		if can_access:
-			make_access_log(doctype="File", document=_file.name, file_type=os.path.splitext(path)[-1][1:])
+	for file_data in files:
+		file: "File" = frappe.get_doc(doctype="File", **file_data)
+		if file.is_downloadable():
 			break
 
-	if not can_access:
+	else:
 		raise Forbidden(_("You don't have permission to access this file"))
 
+	make_access_log(doctype="File", document=file.name, file_type=os.path.splitext(path)[-1][1:])
 	return send_private_file(path.split("/private", 1)[1])
 
 
-def send_private_file(path):
+def send_private_file(path: str) -> Response:
 	path = os.path.join(frappe.local.conf.get("private_path", "private"), path.strip("/"))
 	filename = os.path.basename(path)
 
@@ -243,7 +249,7 @@ def send_private_file(path):
 		filepath = frappe.utils.get_site_path(path)
 		try:
 			f = open(filepath, "rb")
-		except IOError:
+		except OSError:
 			raise NotFound
 
 		response = Response(wrap_file(frappe.local.request.environ, f), direct_passthrough=True)

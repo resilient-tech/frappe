@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2020, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -11,6 +10,17 @@ from frappe.model.document import Document
 
 
 class DashboardSettings(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		chart_config: DF.Code | None
+		user: DF.Link | None
+	# end: auto-generated types
 	pass
 
 
@@ -28,7 +38,7 @@ def get_permission_query_conditions(user):
 	if not user:
 		user = frappe.session.user
 
-	return """(`tabDashboard Settings`.name = {user})""".format(user=frappe.db.escape(user))
+	return f"""(`tabDashboard Settings`.name = {frappe.db.escape(user)})"""
 
 
 @frappe.whitelist()

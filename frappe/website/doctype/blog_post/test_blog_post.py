@@ -20,6 +20,10 @@ class TestBlogPost(FrappeTestCase):
 	def setUp(self):
 		reset_customization("Blog Post")
 
+	def tearDown(self):
+		if hasattr(frappe.local, "request"):
+			delattr(frappe.local, "request")
+
 	def test_generator_view(self):
 		pages = frappe.get_all(
 			"Blog Post", fields=["name", "route"], filters={"published": 1, "route": ("!=", "")}, limit=1
@@ -57,7 +61,7 @@ class TestBlogPost(FrappeTestCase):
 		blog_page_html = frappe.safe_decode(blog_page_response.get_data())
 
 		# On blog post page find link to the category page
-		soup = BeautifulSoup(blog_page_html, "lxml")
+		soup = BeautifulSoup(blog_page_html, "html.parser")
 		category_page_link = list(soup.find_all("a", href=re.compile(blog.blog_category)))[0]
 		category_page_url = category_page_link["href"]
 
@@ -152,6 +156,22 @@ class TestBlogPost(FrappeTestCase):
 		frappe.delete_doc("Blog Post", blog.name)
 		frappe.delete_doc("Blog Category", blog.blog_category)
 
+	def test_like_dislike(self):
+		test_blog = make_test_blog()
+
+		frappe.db.delete("Comment", {"comment_type": "Like", "reference_doctype": "Blog Post"})
+
+		from frappe.templates.includes.likes.likes import like
+
+		liked = like("Blog Post", test_blog.name, True)
+		self.assertEqual(liked, True)
+
+		disliked = like("Blog Post", test_blog.name, False)
+		self.assertEqual(disliked, False)
+
+		frappe.db.delete("Comment", {"comment_type": "Like", "reference_doctype": "Blog Post"})
+		test_blog.delete()
+
 
 def scrub(text):
 	return WebsiteGenerator.scrub(None, text)
@@ -166,7 +186,7 @@ def make_test_blog(category_title="Test Blog Category"):
 			dict(doctype="Blogger", short_name="test-blogger", full_name="Test Blogger")
 		).insert()
 
-	test_blog = frappe.get_doc(
+	return frappe.get_doc(
 		dict(
 			doctype="Blog Post",
 			blog_category=category_name,
@@ -177,5 +197,3 @@ def make_test_blog(category_title="Test Blog Category"):
 			published=1,
 		)
 	).insert()
-
-	return test_blog

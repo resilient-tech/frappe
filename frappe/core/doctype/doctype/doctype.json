@@ -14,6 +14,7 @@
   "istable",
   "issingle",
   "is_tree",
+  "is_calendar_and_gantt",
   "editable_grid",
   "quick_entry",
   "cb01",
@@ -23,46 +24,14 @@
   "custom",
   "beta",
   "is_virtual",
-  "fields_section_break",
-  "fields",
+  "queue_in_background",
   "sb1",
   "naming_rule",
   "autoname",
-  "name_case",
   "allow_rename",
   "column_break_15",
   "description",
   "documentation",
-  "form_settings_section",
-  "image_field",
-  "timeline_field",
-  "nsm_parent_field",
-  "max_attachments",
-  "column_break_23",
-  "hide_toolbar",
-  "allow_copy",
-  "allow_import",
-  "allow_events_in_timeline",
-  "allow_auto_repeat",
-  "view_settings",
-  "title_field",
-  "show_title_field_in_link",
-  "search_fields",
-  "default_print_format",
-  "sort_field",
-  "sort_order",
-  "column_break_29",
-  "document_type",
-  "icon",
-  "color",
-  "show_preview_popup",
-  "show_name_in_global_search",
-  "email_settings_sb",
-  "default_email_template",
-  "column_break_51",
-  "email_append_to",
-  "sender_field",
-  "subject_field",
   "sb2",
   "permissions",
   "restrict_to_domain",
@@ -83,7 +52,47 @@
   "website_search_field",
   "advanced",
   "engine",
-  "migration_hash"
+  "migration_hash",
+  "form_builder_tab",
+  "form_builder",
+  "fields_section",
+  "fields",
+  "settings_tab",
+  "form_settings_section",
+  "image_field",
+  "timeline_field",
+  "nsm_parent_field",
+  "max_attachments",
+  "column_break_23",
+  "hide_toolbar",
+  "allow_copy",
+  "allow_import",
+  "allow_events_in_timeline",
+  "allow_auto_repeat",
+  "make_attachments_public",
+  "view_settings",
+  "title_field",
+  "show_title_field_in_link",
+  "translated_doctype",
+  "search_fields",
+  "default_print_format",
+  "sort_field",
+  "sort_order",
+  "default_view",
+  "force_re_route_to_default_view",
+  "column_break_29",
+  "document_type",
+  "icon",
+  "color",
+  "show_preview_popup",
+  "show_name_in_global_search",
+  "email_settings_sb",
+  "default_email_template",
+  "column_break_51",
+  "email_append_to",
+  "sender_field",
+  "subject_field",
+  "connections_tab"
  ],
  "fields": [
   {
@@ -184,15 +193,10 @@
   },
   {
    "default": "0",
+   "depends_on": "eval:!doc.istable",
    "fieldname": "beta",
    "fieldtype": "Check",
    "label": "Beta"
-  },
-  {
-   "fieldname": "fields_section_break",
-   "fieldtype": "Section Break",
-   "label": "Fields",
-   "oldfieldtype": "Section Break"
   },
   {
    "fieldname": "fields",
@@ -216,15 +220,6 @@
    "oldfieldtype": "Data"
   },
   {
-   "depends_on": "eval:doc.naming_rule !== \"Autoincrement\"",
-   "fieldname": "name_case",
-   "fieldtype": "Select",
-   "label": "Name Case",
-   "oldfieldname": "name_case",
-   "oldfieldtype": "Select",
-   "options": "\nTitle Case\nUPPER CASE"
-  },
-  {
    "fieldname": "column_break_15",
    "fieldtype": "Column Break"
   },
@@ -237,6 +232,7 @@
   },
   {
    "collapsible": 1,
+   "depends_on": "eval:!doc.istable",
    "fieldname": "form_settings_section",
    "fieldtype": "Section Break",
    "label": "Form Settings"
@@ -269,7 +265,7 @@
    "default": "0",
    "fieldname": "hide_toolbar",
    "fieldtype": "Check",
-   "label": "Hide Sidebar and Menu",
+   "label": "Hide Sidebar, Menu, and Comments",
    "oldfieldname": "hide_toolbar",
    "oldfieldtype": "Check"
   },
@@ -310,6 +306,7 @@
   },
   {
    "collapsible": 1,
+   "depends_on": "eval:!doc.istable",
    "fieldname": "view_settings",
    "fieldtype": "Section Break",
    "label": "View Settings"
@@ -318,7 +315,8 @@
    "depends_on": "eval:!doc.istable",
    "fieldname": "title_field",
    "fieldtype": "Data",
-   "label": "Title Field"
+   "label": "Title Field",
+   "mandatory_depends_on": "eval:doc.show_title_field_in_link"
   },
   {
    "depends_on": "eval:!doc.istable",
@@ -419,7 +417,7 @@
    "oldfieldtype": "Check"
   },
   {
-   "depends_on": "eval:doc.custom===0",
+   "depends_on": "eval:doc.custom===0 && !doc.istable",
    "fieldname": "web_view",
    "fieldtype": "Section Break",
    "label": "Web View"
@@ -466,6 +464,7 @@
   },
   {
    "default": "0",
+   "depends_on": "eval:!doc.istable",
    "description": "Tree structures are implemented using Nested Set",
    "fieldname": "is_tree",
    "fieldtype": "Check",
@@ -486,6 +485,7 @@
   {
    "collapsible": 1,
    "collapsible_depends_on": "actions",
+   "depends_on": "eval:!doc.istable",
    "fieldname": "actions_section",
    "fieldtype": "Section Break",
    "label": "Actions"
@@ -499,6 +499,7 @@
   {
    "collapsible": 1,
    "collapsible_depends_on": "links",
+   "depends_on": "eval:!doc.istable",
    "fieldname": "links_section",
    "fieldtype": "Section Break",
    "label": "Linked Documents"
@@ -530,6 +531,7 @@
   },
   {
    "collapsible": 1,
+   "depends_on": "eval:!doc.istable",
    "fieldname": "email_settings_sb",
    "fieldtype": "Section Break",
    "label": "Email Settings"
@@ -582,6 +584,7 @@
   },
   {
    "collapsible": 1,
+   "depends_on": "eval:!doc.istable",
    "fieldname": "document_states_section",
    "fieldtype": "Section Break",
    "label": "Document States"
@@ -591,6 +594,72 @@
    "fieldname": "show_title_field_in_link",
    "fieldtype": "Check",
    "label": "Show Title in Link Fields"
+  },
+  {
+   "default": "0",
+   "fieldname": "translated_doctype",
+   "fieldtype": "Check",
+   "label": "Translate Link Fields"
+  },
+  {
+   "default": "0",
+   "fieldname": "make_attachments_public",
+   "fieldtype": "Check",
+   "label": "Make Attachments Public by Default"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.is_submittable",
+   "description": "Enabling this will submit documents in background",
+   "fieldname": "queue_in_background",
+   "fieldtype": "Check",
+   "label": "Queue in Background (BETA)"
+  },
+  {
+   "fieldname": "default_view",
+   "fieldtype": "Select",
+   "label": "Default View"
+  },
+  {
+   "default": "0",
+   "fieldname": "force_re_route_to_default_view",
+   "fieldtype": "Check",
+   "label": "Force Re-route to Default View"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:!doc.istable",
+   "description": "Enables Calendar and Gantt views.",
+   "fieldname": "is_calendar_and_gantt",
+   "fieldtype": "Check",
+   "label": "Is Calendar and Gantt"
+  },
+  {
+   "fieldname": "settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "Settings"
+  },
+  {
+   "fieldname": "form_builder_tab",
+   "fieldtype": "Tab Break",
+   "label": "Form"
+  },
+  {
+   "fieldname": "form_builder",
+   "fieldtype": "HTML",
+   "label": "Form Builder"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "fields_section",
+   "fieldtype": "Section Break",
+   "label": "Fields"
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
   }
  ],
  "icon": "fa fa-bolt",
@@ -673,7 +742,7 @@
    "link_fieldname": "reference_doctype"
   }
  ],
- "modified": "2022-02-15 21:47:16.467217",
+ "modified": "2023-08-29 12:27:06.587523",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "DocType",
@@ -708,5 +777,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 1,
+ "translated_doctype": 1
 }

@@ -1,6 +1,8 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 
+from markdownify import markdownify as md
+
 import frappe
 
 
@@ -64,11 +66,7 @@ def find_all(list_of_dict, match_function):
 
 	        red_shapes = find_all(colored_shapes, lambda d: d['color'] == 'red')
 	"""
-	found = []
-	for entry in list_of_dict:
-		if match_function(entry):
-			found.append(entry)
-	return found
+	return [entry for entry in list_of_dict if match_function(entry)]
 
 
 def ljust_list(_list, length, fill_word=None):
@@ -86,3 +84,8 @@ def ljust_list(_list, length, fill_word=None):
 		_list.extend([fill_word] * fill_length)
 
 	return _list
+
+
+def html2text(html, strip_links=False, wrap=True):
+	strip = ["a"] if strip_links else None
+	return md(html, heading_style="ATX", strip=strip, wrap=wrap)

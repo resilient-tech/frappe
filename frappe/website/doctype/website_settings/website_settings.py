@@ -1,23 +1,75 @@
-# Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
+# Copyright (c) 2022, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
+import re
 from urllib.parse import quote
 
 import frappe
 from frappe import _
-from frappe.integrations.doctype.google_settings.google_settings import get_auth_url
 from frappe.model.document import Document
 from frappe.utils import encode, get_request_site_address
-from frappe.website.doctype.website_theme.website_theme import add_website_theme
-
-INDEXING_SCOPES = "https://www.googleapis.com/auth/indexing"
+from frappe.website.utils import get_boot_data
 
 
 class WebsiteSettings(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+		from frappe.website.doctype.top_bar_item.top_bar_item import TopBarItem
+		from frappe.website.doctype.website_route_redirect.website_route_redirect import (
+			WebsiteRouteRedirect,
+		)
+
+		address: DF.SmallText | None
+		app_logo: DF.AttachImage | None
+		app_name: DF.Data | None
+		auto_account_deletion: DF.Int
+		banner_html: DF.Code | None
+		banner_image: DF.AttachImage | None
+		brand_html: DF.Code | None
+		call_to_action: DF.Data | None
+		call_to_action_url: DF.Data | None
+		copyright: DF.Data | None
+		disable_signup: DF.Check
+		enable_google_indexing: DF.Check
+		enable_view_tracking: DF.Check
+		favicon: DF.Attach | None
+		footer_items: DF.Table[TopBarItem]
+		footer_logo: DF.AttachImage | None
+		footer_powered: DF.SmallText | None
+		footer_template: DF.Link | None
+		footer_template_values: DF.Code | None
+		google_analytics_anonymize_ip: DF.Check
+		google_analytics_id: DF.Data | None
+		head_html: DF.Code | None
+		hide_footer_signup: DF.Check
+		hide_login: DF.Check
+		home_page: DF.Data | None
+		indexing_authorization_code: DF.Data | None
+		indexing_refresh_token: DF.Data | None
+		navbar_search: DF.Check
+		navbar_template: DF.Link | None
+		navbar_template_values: DF.Code | None
+		robots_txt: DF.Code | None
+		route_redirects: DF.Table[WebsiteRouteRedirect]
+		show_account_deletion_link: DF.Check
+		show_language_picker: DF.Check
+		splash_image: DF.AttachImage | None
+		subdomain: DF.SmallText | None
+		title_prefix: DF.Data | None
+		top_bar_items: DF.Table[TopBarItem]
+		website_theme: DF.Link | None
+		website_theme_image_link: DF.Code | None
+	# end: auto-generated types
 	def validate(self):
 		self.validate_top_bar_items()
 		self.validate_footer_items()
 		self.validate_home_page()
 		self.validate_google_settings()
+		self.validate_redirects()
 
 	def validate_home_page(self):
 		if frappe.flags.in_install:
@@ -74,6 +126,16 @@ class WebsiteSettings(Document):
 		if self.enable_google_indexing and not frappe.db.get_single_value("Google Settings", "enable"):
 			frappe.throw(_("Enable Google API in Google Settings."))
 
+	def validate_redirects(self):
+		for idx, row in enumerate(self.route_redirects):
+			try:
+				source = row.source.strip("/ ") + "$"
+				re.compile(source)
+				re.sub(source, row.target, "")
+			except Exception as e:
+				if not frappe.flags.in_migrate:
+					frappe.throw(_("Invalid redirect regex in row #{}: {}").format(idx, str(e)))
+
 	def on_update(self):
 		self.clear_cache()
 
@@ -90,45 +152,29 @@ class WebsiteSettings(Document):
 		frappe.clear_cache()
 
 	def get_access_token(self):
-		import requests
-
-		google_settings = frappe.get_doc("Google Settings")
-
-		if not google_settings.enable:
-			frappe.throw(_("Google Integration is disabled."))
+		from frappe.integrations.google_oauth import GoogleOAuth
 
 		if not self.indexing_refresh_token:
 			button_label = frappe.bold(_("Allow API Indexing Access"))
 			raise frappe.ValidationError(_("Click on {0} to generate Refresh Token.").format(button_label))
 
-		data = {
-			"client_id": google_settings.client_id,
-			"client_secret": google_settings.get_password(fieldname="client_secret", raise_exception=False),
-			"refresh_token": self.get_password(fieldname="indexing_refresh_token", raise_exception=False),
-			"grant_type": "refresh_token",
-			"scope": INDEXING_SCOPES,
-		}
-
-		try:
-			res = requests.post(get_auth_url(), data=data).json()
-		except requests.exceptions.HTTPError:
-			button_label = frappe.bold(_("Allow Google Indexing Access"))
-			frappe.throw(
-				_(
-					"Something went wrong during the token generation. Click on {0} to generate a new one."
-				).format(button_label)
-			)
+		oauth_obj = GoogleOAuth("indexing")
+		res = oauth_obj.refresh_access_token(
+			self.get_password(fieldname="indexing_refresh_token", raise_exception=False)
+		)
 
 		return res.get("access_token")
 
 
 def get_website_settings(context=None):
 	hooks = frappe.get_hooks()
-	context = context or frappe._dict()
+	context = frappe._dict(context or {})
+	settings: "WebsiteSettings" = frappe.get_cached_doc("Website Settings")
+
 	context = context.update(
 		{
-			"top_bar_items": get_items("top_bar_items"),
-			"footer_items": get_items("footer_items"),
+			"top_bar_items": modify_header_footer_items(settings.top_bar_items),
+			"footer_items": modify_header_footer_items(settings.footer_items),
 			"post_login": [
 				{"label": _("My Account"), "url": "/me"},
 				{"label": _("Log out"), "url": "/?cmd=web_logout"},
@@ -136,7 +182,6 @@ def get_website_settings(context=None):
 		}
 	)
 
-	settings = frappe.get_single("Website Settings")
 	for k in [
 		"banner_html",
 		"banner_image",
@@ -161,11 +206,8 @@ def get_website_settings(context=None):
 		"show_language_picker",
 		"footer_powered",
 	]:
-		if hasattr(settings, k):
-			context[k] = settings.get(k)
-
-	if settings.address:
-		context["footer_address"] = settings.address
+		if setting_value := settings.get(k):
+			context[k] = setting_value
 
 	for k in [
 		"facebook_share",
@@ -176,16 +218,19 @@ def get_website_settings(context=None):
 	]:
 		context[k] = int(context.get(k) or 0)
 
+	if settings.address:
+		context["footer_address"] = settings.address
+
 	if frappe.request:
 		context.url = quote(str(get_request_site_address(full_address=True)), safe="/:")
 
-	context.encoded_title = quote(encode(context.title or ""), str(""))
+	context.encoded_title = quote(encode(context.title or ""), "")
 
 	context.web_include_js = hooks.web_include_js or []
 
 	context.web_include_css = hooks.web_include_css or []
 
-	via_hooks = frappe.get_hooks("website_context")
+	via_hooks = hooks.website_context or []
 	for key in via_hooks:
 		context[key] = via_hooks[key]
 		if key not in ("top_bar_items", "footer_items", "post_login") and isinstance(
@@ -193,7 +238,13 @@ def get_website_settings(context=None):
 		):
 			context[key] = context[key][-1]
 
-	add_website_theme(context)
+	if context.disable_website_theme:
+		context.theme = frappe._dict()
+
+	else:
+		from frappe.website.doctype.website_theme.website_theme import get_active_theme
+
+		context.theme = get_active_theme() or frappe._dict()
 
 	if not context.get("favicon"):
 		context["favicon"] = "/assets/frappe/images/frappe-favicon.svg"
@@ -203,30 +254,42 @@ def get_website_settings(context=None):
 
 	context["hide_login"] = settings.hide_login
 
+	if settings.splash_image:
+		context["splash_image"] = settings.splash_image
+
+	context.read_only_mode = frappe.flags.read_only
+	context.boot = get_boot_data()
+
 	return context
 
 
-def get_items(parentfield):
-	all_top_items = frappe.db.sql(
-		"""\
-		select * from `tabTop Bar Item`
-		where parent='Website Settings' and parentfield= %s
-		order by idx asc""",
-		parentfield,
-		as_dict=1,
+def get_items(parentfield: str) -> list[dict]:
+	_items = frappe.get_all(
+		"Top Bar Item",
+		filters={"parent": "Website Settings", "parentfield": parentfield},
+		order_by="idx asc",
+		fields="*",
 	)
+	return modify_header_footer_items(_items)
 
-	top_items = all_top_items[:]
 
+def modify_header_footer_items(items: list):
+	top_items = items.copy()
 	# attach child items to top bar
-	for d in all_top_items:
-		if d["parent_label"]:
-			for t in top_items:
-				if t["label"] == d["parent_label"]:
-					if not "child_items" in t:
-						t["child_items"] = []
-					t["child_items"].append(d)
-					break
+	for item in items:
+		if not item.parent_label:
+			continue
+
+		for top_bar_item in top_items:
+			if top_bar_item.label != item.parent_label:
+				continue
+
+			if not top_bar_item.get("child_items"):
+				top_bar_item.child_items = []
+
+			top_bar_item.child_items.append(item)
+			break
+
 	return top_items
 
 

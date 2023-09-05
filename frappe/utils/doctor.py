@@ -9,8 +9,7 @@ from frappe.utils.scheduler import is_scheduler_disabled, is_scheduler_inactive
 
 def get_workers():
 	with Connection(get_redis_conn()):
-		workers = Worker.all()
-		return workers
+		return Worker.all()
 
 
 def purge_pending_jobs(event=None, site=None, queue=None):
@@ -20,8 +19,8 @@ def purge_pending_jobs(event=None, site=None, queue=None):
 	mintues and would any leave daily, hourly and weekly tasks
 	"""
 	purged_task_count = 0
-	for queue in get_queue_list(queue):
-		q = get_queue(queue)
+	for _queue in get_queue_list(queue):
+		q = get_queue(_queue)
 		for job in q.jobs:
 			if site and event:
 				if job.kwargs["site"] == site and job.kwargs["event"] == event:
@@ -74,9 +73,18 @@ def get_pending_jobs(site=None):
 		for job in q.jobs:
 			method_kwargs = job.kwargs["kwargs"] if job.kwargs["kwargs"] else ""
 			if job.kwargs["site"] == site:
-				jobs_per_queue[queue].append("{0} {1}".format(job.kwargs["method"], method_kwargs))
+				jobs_per_queue[queue].append("{} {}".format(job.kwargs["method"], method_kwargs))
 
 	return jobs_per_queue
+
+
+def any_job_pending(site: str) -> bool:
+	for queue in get_queue_list():
+		q = get_queue(queue)
+		for job_id in q.get_job_ids():
+			if job_id.startswith(site):
+				return True
+	return False
 
 
 def check_number_of_workers():
@@ -122,14 +130,14 @@ def doctor(site=None):
 
 	# TODO improve this
 	print("Workers online:", workers_online)
-	print("-----{0} Jobs-----".format(site))
+	print(f"-----{site} Jobs-----")
 	for queue in get_queue_list():
 		if jobs_per_queue[queue]:
 			print("Queue:", queue)
 			print("Number of Jobs: ", job_count[queue])
 			print("Methods:")
 			for method, count in jobs_per_queue[queue].items():
-				print("{0} : {1}".format(method, count))
+				print(f"{method} : {count}")
 			print("------------")
 
 	return True
@@ -140,5 +148,5 @@ def pending_jobs(site=None):
 	pending_jobs = get_pending_jobs(site)
 	for queue in get_queue_list():
 		if pending_jobs[queue]:
-			print("-----Queue :{0}-----".format(queue))
+			print(f"-----Queue :{queue}-----")
 			print("\n".join(pending_jobs[queue]))

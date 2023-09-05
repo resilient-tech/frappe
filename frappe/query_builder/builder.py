@@ -1,3 +1,5 @@
+import typing
+
 from pypika import MySQLQuery, Order, PostgreSQLQuery, terms
 from pypika.dialects import MySQLQueryBuilder, PostgreSQLQueryBuilder
 from pypika.queries import QueryBuilder, Schema, Table
@@ -10,8 +12,16 @@ from frappe.utils import get_table_name
 class Base:
 	terms = terms
 	desc = Order.desc
+	asc = Order.asc
 	Schema = Schema
 	Table = Table
+
+	# Added dynamic type hints for engine attribute
+	# which is to be assigned later.
+	if typing.TYPE_CHECKING:
+		from frappe.database.query import Engine
+
+		engine: Engine
 
 	@staticmethod
 	def functions(name: str, *args, **kwargs) -> Function:
@@ -38,6 +48,8 @@ class Base:
 class MariaDB(Base, MySQLQuery):
 	Field = terms.Field
 
+	_BuilderClasss = MySQLQueryBuilder
+
 	@classmethod
 	def _builder(cls, *args, **kwargs) -> "MySQLQueryBuilder":
 		return super()._builder(*args, wrapper_cls=ParameterizedValueWrapper, **kwargs)
@@ -61,6 +73,8 @@ class Postgres(Base, PostgreSQLQuery):
 	# they are two different objects. The quick fix used here is to replace the
 	# Field names in the "Field" function.
 
+	_BuilderClasss = PostgreSQLQueryBuilder
+
 	@classmethod
 	def _builder(cls, *args, **kwargs) -> "PostgreSQLQueryBuilder":
 		return super()._builder(*args, wrapper_cls=ParameterizedValueWrapper, **kwargs)
@@ -76,7 +90,7 @@ class Postgres(Base, PostgreSQLQuery):
 		if isinstance(table, Table):
 			if table._schema:
 				if table._schema._name == "information_schema":
-					table = cls.schema_translation[table._table_name]
+					table = cls.schema_translation.get(table._table_name) or table
 
 		elif isinstance(table, str):
 			table = cls.DocType(table)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -7,11 +6,22 @@ from frappe.model.document import Document
 
 
 class GoogleSettings(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		api_key: DF.Data | None
+		app_id: DF.Data | None
+		client_id: DF.Data | None
+		client_secret: DF.Password | None
+		enable: DF.Check
+		google_drive_picker_enabled: DF.Check
+	# end: auto-generated types
 	pass
-
-
-def get_auth_url():
-	return "https://www.googleapis.com/oauth2/v4/token"
 
 
 @frappe.whitelist()

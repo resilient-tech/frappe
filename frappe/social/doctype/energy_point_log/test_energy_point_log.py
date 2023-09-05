@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and Contributors
 # License: MIT. See LICENSE
 import frappe
 from frappe.desk.form.assign_to import add as assign_to
+from frappe.desk.page.user_profile.user_profile import get_energy_points_heatmap_data
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils.testutils import add_custom_field, clear_custom_fields
 
@@ -14,6 +14,7 @@ from .energy_point_log import review
 class TestEnergyPointLog(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
+		super().setUpClass()
 		settings = frappe.get_single("Energy Point Settings")
 		settings.enabled = 1
 		settings.save()
@@ -25,13 +26,13 @@ class TestEnergyPointLog(FrappeTestCase):
 		settings.save()
 
 	def setUp(self):
-		frappe.cache().delete_value("energy_point_rule_map")
+		frappe.cache.delete_value("energy_point_rule_map")
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
 		frappe.db.delete("Energy Point Log")
 		frappe.db.delete("Energy Point Rule")
-		frappe.cache().delete_value("energy_point_rule_map")
+		frappe.cache.delete_value("energy_point_rule_map")
 
 	def test_user_energy_point(self):
 		frappe.set_user("test@example.com")
@@ -234,6 +235,10 @@ class TestEnergyPointLog(FrappeTestCase):
 
 		self.assertEqual(test2_user_after_points, test2_user_before_points + rule.points)
 
+	def test_eps_heatmap_query(self):
+		# Just asserts that query works, not correctness.
+		self.assertIsInstance(get_energy_points_heatmap_data(user="test@example.com", date=None), dict)
+
 	def test_points_on_field_value_change(self):
 		rule = create_energy_point_rule_for_todo(
 			for_doc_event="Value Change", field_to_check="description"
@@ -317,8 +322,9 @@ class TestEnergyPointLog(FrappeTestCase):
 		# do not update energy points for disabled user
 		self.assertEqual(points_after_closing_todo, energy_point_of_user)
 
-		user.enabled = 1
-		user.save()
+		with self.set_user("Administrator"):
+			user.enabled = 1
+			user.save()
 
 		created_todo.save()
 		points_after_re_saving_todo = get_points("test@example.com")

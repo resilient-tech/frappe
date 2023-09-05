@@ -4,15 +4,11 @@ import os
 import re
 import shutil
 import subprocess
-from distutils.spawn import find_executable
 from subprocess import getoutput
-from tempfile import mkdtemp, mktemp
+from tempfile import mkdtemp
 from urllib.parse import urlparse
 
 import click
-import psutil
-from requests import head
-from requests.exceptions import HTTPError
 from semantic_version import Version
 
 import frappe
@@ -20,13 +16,15 @@ import frappe
 timestamps = {}
 app_paths = None
 sites_path = os.path.abspath(os.getcwd())
+WHITESPACE_PATTERN = re.compile(r"\s+")
+HTML_COMMENT_PATTERN = re.compile(r"(<!--.*?-->)")
 
 
 class AssetsNotDownloadedError(Exception):
 	pass
 
 
-class AssetsDontExistError(HTTPError):
+class AssetsDontExistError(Exception):
 	pass
 
 
@@ -77,6 +75,8 @@ def build_missing_files():
 
 
 def get_assets_link(frappe_head) -> str:
+	import requests
+
 	tag = getoutput(
 		r"cd ../apps/frappe && git show-ref --tags -d | grep %s | sed -e 's,.*"
 		r" refs/tags/,,' -e 's/\^{}//'" % frappe_head
@@ -88,7 +88,7 @@ def get_assets_link(frappe_head) -> str:
 	else:
 		url = f"http://assets.frappeframework.com/{frappe_head}.tar.gz"
 
-	if not head(url):
+	if not requests.head(url):
 		reference = f"Release {tag}" if tag else f"Commit {frappe_head}"
 		raise AssetsDontExistError(f"Assets for {reference} don't exist")
 
@@ -183,7 +183,7 @@ def symlink(target, link_name, overwrite=False):
 
 	# Create link to target with temporary filename
 	while True:
-		temp_link_name = mktemp(dir=link_dir)
+		temp_link_name = f"tmp{frappe.generate_hash()}"
 
 		# os.* functions mimic as closely as possible system functions
 		# The POSIX symlink() returns EEXIST if link_name already exists
@@ -198,12 +198,12 @@ def symlink(target, link_name, overwrite=False):
 	try:
 		# Pre-empt os.replace on a directory with a nicer message
 		if os.path.isdir(link_name):
-			raise IsADirectoryError("Cannot symlink over existing directory: '{}'".format(link_name))
+			raise IsADirectoryError(f"Cannot symlink over existing directory: '{link_name}'")
 		try:
 			os.replace(temp_link_name, link_name)
 		except AttributeError:
 			os.renames(temp_link_name, link_name)
-	except:
+	except Exception:
 		if os.path.islink(temp_link_name):
 			os.remove(temp_link_name)
 		raise
@@ -226,21 +226,20 @@ def bundle(
 	mode,
 	apps=None,
 	hard_link=False,
-	make_copy=False,
-	restore=False,
 	verbose=False,
 	skip_frappe=False,
 	files=None,
+	save_metafiles=False,
 ):
 	"""concat / minify js files"""
 	setup()
 	make_asset_dirs(hard_link=hard_link)
 
 	mode = "production" if mode == "production" else "build"
-	command = "yarn run {mode}".format(mode=mode)
+	command = f"yarn run {mode}"
 
 	if apps:
-		command += " --apps {apps}".format(apps=apps)
+		command += f" --apps {apps}"
 
 	if skip_frappe:
 		command += " --skip_frappe"
@@ -250,8 +249,11 @@ def bundle(
 
 	command += " --run-build-command"
 
+	if save_metafiles:
+		command += " --save-metafiles"
+
 	check_node_executable()
-	frappe_app_path = frappe.get_app_path("frappe", "..")
+	frappe_app_path = frappe.get_app_source_path("frappe")
 	frappe.commands.popen(command, cwd=frappe_app_path, env=get_node_env(), raise_err=True)
 
 
@@ -261,7 +263,7 @@ def watch(apps=None):
 
 	command = "yarn run watch"
 	if apps:
-		command += " --apps {apps}".format(apps=apps)
+		command += f" --apps {apps}"
 
 	live_reload = frappe.utils.cint(os.environ.get("LIVE_RELOAD", frappe.conf.live_reload))
 
@@ -269,26 +271,27 @@ def watch(apps=None):
 		command += " --live-reload"
 
 	check_node_executable()
-	frappe_app_path = frappe.get_app_path("frappe", "..")
+	frappe_app_path = frappe.get_app_source_path("frappe")
 	frappe.commands.popen(command, cwd=frappe_app_path, env=get_node_env())
 
 
 def check_node_executable():
 	node_version = Version(subprocess.getoutput("node -v")[1:])
 	warn = "⚠️ "
-	if node_version.major < 14:
-		click.echo(f"{warn} Please update your node version to 14")
-	if not find_executable("yarn"):
+	if node_version.major < 18:
+		click.echo(f"{warn} Please update your node version to 18")
+	if not shutil.which("yarn"):
 		click.echo(f"{warn} Please install yarn using below command and try again.\nnpm install -g yarn")
 	click.echo()
 
 
 def get_node_env():
-	node_env = {"NODE_OPTIONS": f"--max_old_space_size={get_safe_max_old_space_size()}"}
-	return node_env
+	return {"NODE_OPTIONS": f"--max_old_space_size={get_safe_max_old_space_size()}"}
 
 
 def get_safe_max_old_space_size():
+	import psutil
+
 	safe_max_old_space_size = 0
 	try:
 		total_memory = psutil.virtual_memory().total / (1024 * 1024)
@@ -406,10 +409,10 @@ def link_assets_dir(source, target, hard_link=False):
 def scrub_html_template(content):
 	"""Returns HTML content with removed whitespace and comments"""
 	# remove whitespace to a single space
-	content = re.sub(r"\s+", " ", content)
+	content = WHITESPACE_PATTERN.sub(" ", content)
 
 	# strip comments
-	content = re.sub(r"(<!--.*?-->)", "", content)
+	content = HTML_COMMENT_PATTERN.sub("", content)
 
 	return content.replace("'", "'")
 

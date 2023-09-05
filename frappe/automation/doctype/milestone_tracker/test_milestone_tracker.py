@@ -1,17 +1,15 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and Contributors
 # License: MIT. See LICENSE
-import unittest
-
 import frappe
 import frappe.cache_manager
+from frappe.tests.utils import FrappeTestCase
 
 
-class TestMilestoneTracker(unittest.TestCase):
+class TestMilestoneTracker(FrappeTestCase):
 	def test_milestone(self):
 		frappe.db.delete("Milestone Tracker")
 
-		frappe.cache().delete_key("milestone_tracker_map")
+		frappe.cache.delete_key("milestone_tracker_map")
 
 		milestone_tracker = frappe.get_doc(
 			dict(doctype="Milestone Tracker", document_type="ToDo", track_field="status")

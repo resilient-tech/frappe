@@ -2,7 +2,6 @@
 # License: MIT. See LICENSE
 
 import frappe
-from frappe import _
 from frappe.desk.doctype.global_search_settings.global_search_settings import (
 	update_global_search_doctypes,
 )
@@ -18,7 +17,6 @@ def install():
 	add_unsubscribe()
 
 
-@frappe.whitelist()
 def update_genders():
 	default_genders = [
 		"Male",
@@ -34,7 +32,6 @@ def update_genders():
 		frappe.get_doc(record).insert(ignore_permissions=True, ignore_if_duplicate=True)
 
 
-@frappe.whitelist()
 def update_salutations():
 	default_salutations = ["Mr", "Ms", "Mx", "Dr", "Mrs", "Madam", "Miss", "Master", "Prof"]
 	records = [{"doctype": "Salutation", "salutation": d} for d in default_salutations]

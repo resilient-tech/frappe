@@ -3,6 +3,7 @@
 import getpass
 
 import frappe
+from frappe.geo.doctype.country.country import import_country_and_currency
 from frappe.utils.password import update_password
 
 
@@ -18,20 +19,14 @@ def before_install():
 
 
 def after_install():
-	# reset installed apps for re-install
-	frappe.db.set_global("installed_apps", '["frappe"]')
-
 	create_user_type()
 	install_basic_docs()
 
-	from frappe.core.doctype.file.file import make_home_folder
-
-	make_home_folder()
-
-	import_country_and_currency()
-
+	from frappe.core.doctype.file.utils import make_home_folder
 	from frappe.core.doctype.language.language import sync_languages
 
+	make_home_folder()
+	import_country_and_currency()
 	sync_languages()
 
 	# save default print setting
@@ -45,7 +40,10 @@ def after_install():
 	update_password("Administrator", get_admin_password())
 
 	if not frappe.conf.skip_setup_wizard:
-		frappe.db.set_default("desktop:home_page", "setup-wizard")
+		# only set home_page if the value doesn't exist in the db
+		if not frappe.db.get_default("desktop:home_page"):
+			frappe.db.set_default("desktop:home_page", "setup-wizard")
+			frappe.db.set_single_value("System Settings", "setup_complete", 0)
 
 	# clear test log
 	with open(frappe.get_site_path(".test_log"), "w") as f:
@@ -171,6 +169,7 @@ def before_tests():
 	if not int(frappe.db.get_single_value("System Settings", "setup_complete") or 0):
 		complete_setup_wizard()
 
+	frappe.db.set_single_value("Website Settings", "disable_signup", 0)
 	frappe.db.commit()
 	frappe.clear_cache()
 
@@ -191,55 +190,12 @@ def complete_setup_wizard():
 	)
 
 
-def import_country_and_currency():
-	from frappe.geo.country_info import get_all
-	from frappe.utils import update_progress_bar
-
-	data = get_all()
-
-	for i, name in enumerate(data):
-		update_progress_bar("Updating country info", i, len(data))
-		country = frappe._dict(data[name])
-		add_country_and_currency(name, country)
-
-	print("")
-
-	# enable frequently used currencies
-	for currency in ("INR", "USD", "GBP", "EUR", "AED", "AUD", "JPY", "CNY", "CHF"):
-		frappe.db.set_value("Currency", currency, "enabled", 1)
-
-
-def add_country_and_currency(name, country):
-	if not frappe.db.exists("Country", name):
-		frappe.get_doc(
-			{
-				"doctype": "Country",
-				"country_name": name,
-				"code": country.code,
-				"date_format": country.date_format or "dd-mm-yyyy",
-				"time_format": country.time_format or "HH:mm:ss",
-				"time_zones": "\n".join(country.timezones or []),
-				"docstatus": 0,
-			}
-		).db_insert()
-
-	if country.currency and not frappe.db.exists("Currency", country.currency):
-		frappe.get_doc(
-			{
-				"doctype": "Currency",
-				"currency_name": country.currency,
-				"fraction": country.currency_fraction,
-				"symbol": country.currency_symbol,
-				"fraction_units": country.currency_fraction_units,
-				"smallest_currency_fraction_value": country.smallest_currency_fraction_value,
-				"number_format": country.number_format,
-				"docstatus": 0,
-			}
-		).db_insert()
-
-
 def add_standard_navbar_items():
 	navbar_settings = frappe.get_single("Navbar Settings")
+
+	# don't add settings/help options if they're already present
+	if navbar_settings.settings_dropdown and navbar_settings.help_dropdown:
+		return
 
 	standard_navbar_items = [
 		{
@@ -285,12 +241,10 @@ def add_standard_navbar_items():
 			"is_standard": 1,
 		},
 		{
-			"item_label": "Background Jobs",
-			"item_type": "Route",
-			"route": "/app/background_jobs",
+			"item_type": "Separator",
 			"is_standard": 1,
+			"item_label": "",
 		},
-		{"item_type": "Separator", "is_standard": 1},
 		{
 			"item_label": "Log out",
 			"item_type": "Action",

@@ -34,6 +34,7 @@ ignore_values = {
 	"Print Style": ["disabled"],
 	"Module Onboarding": ["is_complete"],
 	"Onboarding Step": ["is_complete", "is_skipped"],
+	"Workspace": ["is_hidden"],
 }
 
 ignore_doctypes = [""]
@@ -41,14 +42,17 @@ ignore_doctypes = [""]
 
 def import_files(module, dt=None, dn=None, force=False, pre_process=None, reset_permissions=False):
 	if type(module) is list:
-		out = []
-		for m in module:
-			out.append(
-				import_file(
-					m[0], m[1], m[2], force=force, pre_process=pre_process, reset_permissions=reset_permissions
-				)
+		return [
+			import_file(
+				m[0],
+				m[1],
+				m[2],
+				force=force,
+				pre_process=pre_process,
+				reset_permissions=reset_permissions,
 			)
-		return out
+			for m in module
+		]
 	else:
 		return import_file(
 			module, dt, dn, force=force, pre_process=pre_process, reset_permissions=reset_permissions
@@ -58,10 +62,9 @@ def import_files(module, dt=None, dn=None, force=False, pre_process=None, reset_
 def import_file(module, dt, dn, force=False, pre_process=None, reset_permissions=False):
 	"""Sync a file from txt if modifed, return false if not updated"""
 	path = get_file_path(module, dt, dn)
-	ret = import_file_by_path(
+	return import_file_by_path(
 		path, force, pre_process=pre_process, reset_permissions=reset_permissions
 	)
-	return ret
 
 
 def get_file_path(module, dt, dn):
@@ -109,7 +112,7 @@ def import_file_by_path(
 	"""
 	try:
 		docs = read_doc_from_file(path)
-	except IOError:
+	except OSError:
 		print(f"{path} missing")
 		return
 
@@ -144,7 +147,6 @@ def import_file_by_path(
 
 			import_doc(
 				docdict=doc,
-				force=force,
 				data_import=data_import,
 				pre_process=pre_process,
 				ignore_version=ignore_version,
@@ -173,14 +175,14 @@ def import_file_by_path(
 def read_doc_from_file(path):
 	doc = None
 	if os.path.exists(path):
-		with open(path, "r") as f:
+		with open(path) as f:
 			try:
 				doc = json.loads(f.read())
 			except ValueError:
-				print("bad json: {0}".format(path))
+				print(f"bad json: {path}")
 				raise
 	else:
-		raise IOError("%s missing" % path)
+		raise OSError("%s missing" % path)
 
 	return doc
 
@@ -203,7 +205,6 @@ def update_modified(original_modified, doc):
 
 def import_doc(
 	docdict,
-	force=False,
 	data_import=False,
 	pre_process=None,
 	ignore_version=None,
@@ -254,9 +255,9 @@ def load_code_properties(doc, path):
 		if hasattr(doc, "get_code_fields"):
 			dirname, filename = os.path.split(path)
 			for key, extn in doc.get_code_fields().items():
-				codefile = os.path.join(dirname, filename.split(".")[0] + "." + extn)
+				codefile = os.path.join(dirname, filename.split(".", 1)[0] + "." + extn)
 				if os.path.exists(codefile):
-					with open(codefile, "r") as txtfile:
+					with open(codefile) as txtfile:
 						doc.set(key, txtfile.read())
 
 
@@ -287,6 +288,6 @@ def reset_tree_properties(doc):
 	# "rgt". They are automatically set and kept up-to-date. Importing them
 	# would destroy any existing tree structure.
 	if getattr(doc.meta, "is_tree", None) and any([doc.lft, doc.rgt]):
-		print('Ignoring values of `lft` and `rgt` for {} "{}"'.format(doc.doctype, doc.name))
+		print(f'Ignoring values of `lft` and `rgt` for {doc.doctype} "{doc.name}"')
 		doc.lft = None
 		doc.rgt = None

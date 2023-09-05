@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2017, Frappe Technologies and Contributors
 # License: MIT. See LICENSE
-import unittest
 from unittest.mock import MagicMock, patch
 
 from rauth import OAuth2Service
@@ -9,11 +7,12 @@ from rauth import OAuth2Service
 import frappe
 from frappe.auth import CookieManager, LoginManager
 from frappe.integrations.doctype.social_login_key.social_login_key import BaseUrlNotSetError
+from frappe.tests.utils import FrappeTestCase
 from frappe.utils import set_request
 from frappe.utils.oauth import login_via_oauth2
 
 
-class TestSocialLoginKey(unittest.TestCase):
+class TestSocialLoginKey(FrappeTestCase):
 	def test_adding_frappe_social_login_provider(self):
 		provider_name = "Frappe"
 		social_login_key = make_social_login_key(social_login_provider=provider_name)
@@ -58,8 +57,7 @@ def make_social_login_key(**kwargs):
 	kwargs["doctype"] = "Social Login Key"
 	if not "provider_name" in kwargs:
 		kwargs["provider_name"] = "Test OAuth2 Provider"
-	doc = frappe.get_doc(kwargs)
-	return doc
+	return frappe.get_doc(kwargs)
 
 
 def create_or_update_social_login_key():

@@ -11,7 +11,15 @@ class SiteNotSpecifiedError(Exception):
 		super(Exception, self).__init__(self.message)
 
 
+class UrlSchemeNotSupported(Exception):
+	pass
+
+
 class ValidationError(Exception):
+	http_status_code = 417
+
+
+class FrappeTypeError(TypeError):
 	http_status_code = 417
 
 
@@ -76,7 +84,7 @@ class ImproperDBConfigurationError(Exception):
 	def __init__(self, reason, msg=None):
 		if not msg:
 			msg = "MariaDb is not properly configured"
-		super(ImproperDBConfigurationError, self).__init__(msg)
+		super().__init__(msg)
 		self.reason = reason
 
 
@@ -236,6 +244,18 @@ class QueryDeadlockError(Exception):
 	pass
 
 
+class InReadOnlyMode(ValidationError):
+	http_status_code = 503  # temporarily not available
+
+
+class SessionBootFailed(ValidationError):
+	http_status_code = 500
+
+
+class PrintFormatError(ValidationError):
+	pass
+
+
 class TooManyWritesError(Exception):
 	pass
 
@@ -261,5 +281,21 @@ class ExecutableNotFound(FileNotFoundError):
 	pass
 
 
+class InvalidRoundingMethod(FileNotFoundError):
+	pass
+
+
 class InvalidRemoteException(Exception):
 	pass
+
+
+class LinkExpired(ValidationError):
+	http_status_code = 410
+	title = "Link Expired"
+	message = "The link has expired"
+
+
+class InvalidKeyError(ValidationError):
+	http_status_code = 401
+	title = "Invalid Key"
+	message = "The document key is invalid"

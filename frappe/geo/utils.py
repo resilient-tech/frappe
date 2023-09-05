@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2020, Frappe Technologies and contributors
 # License: MIT. See LICENSE
-
-from pymysql import InternalError
 
 import frappe
 
@@ -18,8 +15,7 @@ def get_coords(doctype, filters, type):
 	elif type == "coordinates":
 		coords = return_coordinates(doctype, filters_sql)
 
-	out = convert_to_geojson(type, coords)
-	return out
+	return convert_to_geojson(type, coords)
 
 
 def convert_to_geojson(type, coords):
@@ -54,7 +50,7 @@ def create_gps_markers(coords):
 	for i in coords:
 		node = {"type": "Feature", "properties": {}, "geometry": {"type": "Point", "coordinates": None}}
 		node["properties"]["name"] = i.name
-		node["geometry"]["coordinates"] = [i.latitude, i.longitude]
+		node["geometry"]["coordinates"] = [i.longitude, i.latitude]  # geojson needs it reverse!
 		geojson_dict.append(node.copy())
 
 	return geojson_dict
@@ -65,9 +61,9 @@ def return_location(doctype, filters_sql):
 	if filters_sql:
 		try:
 			coords = frappe.db.sql(
-				"""SELECT name, location FROM `tab{}`  WHERE {}""".format(doctype, filters_sql), as_dict=True
+				f"""SELECT name, location FROM `tab{doctype}`  WHERE {filters_sql}""", as_dict=True
 			)
-		except InternalError:
+		except frappe.db.InternalError:
 			frappe.msgprint(frappe._("This Doctype does not contain location fields"), raise_exception=True)
 			return
 	else:
@@ -80,10 +76,10 @@ def return_coordinates(doctype, filters_sql):
 	if filters_sql:
 		try:
 			coords = frappe.db.sql(
-				"""SELECT name, latitude, longitude FROM `tab{}`  WHERE {}""".format(doctype, filters_sql),
+				f"""SELECT name, latitude, longitude FROM `tab{doctype}`  WHERE {filters_sql}""",
 				as_dict=True,
 			)
-		except InternalError:
+		except frappe.db.InternalError:
 			frappe.msgprint(
 				frappe._("This Doctype does not contain latitude and longitude fields"), raise_exception=True
 			)

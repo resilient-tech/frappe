@@ -76,6 +76,7 @@
 
 .layout-main-section-wrapper {
 	margin-bottom: var(--page-bottom-margin);
+	min-width: 0;
 }
 
 .layout-main-section.frappe-card {
@@ -84,7 +85,7 @@
 }
 
 .page-head {
-	z-index: 4;
+	z-index: 6;
 	position: sticky;
 	top: var(--navbar-height);
 	background: var(--bg-color);

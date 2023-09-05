@@ -1,5 +1,5 @@
-import io
 import os
+from importlib.machinery import all_suffixes
 
 import click
 
@@ -16,6 +16,8 @@ from frappe.website.utils import (
 	get_toc,
 	is_binary_file,
 )
+
+PY_LOADER_SUFFIXES = tuple(all_suffixes())
 
 WEBPAGE_PY_MODULE_PROPERTIES = (
 	"base_template_path",
@@ -48,7 +50,7 @@ class TemplatePage(BaseTemplatePage):
 		and /templates/pages folders and sets path if match is found
 		"""
 		folders = get_start_folders()
-		for app in frappe.get_installed_apps(frappe_last=True):
+		for app in reversed(frappe.get_installed_apps()):
 			app_path = frappe.get_app_path(app)
 
 			for dirname in folders:
@@ -66,7 +68,11 @@ class TemplatePage(BaseTemplatePage):
 						return
 
 	def can_render(self):
-		return hasattr(self, "template_path") and bool(self.template_path)
+		return (
+			hasattr(self, "template_path")
+			and self.template_path
+			and not self.template_path.endswith(PY_LOADER_SUFFIXES)
+		)
 
 	@staticmethod
 	def get_index_path_options(search_path):
@@ -100,11 +106,10 @@ class TemplatePage(BaseTemplatePage):
 	def post_process_context(self):
 		self.set_user_info()
 		self.add_sidebar_and_breadcrumbs()
-		super(TemplatePage, self).post_process_context()
+		super().post_process_context()
 
 	def add_sidebar_and_breadcrumbs(self):
-		if self.basepath:
-			self.context.sidebar_items = get_sidebar_items(self.context.website_sidebar, self.basepath)
+		self.context.sidebar_items = get_sidebar_items(self.context.website_sidebar, self.basepath)
 
 		if self.context.add_breadcrumbs and not self.context.parents:
 			parent_path = os.path.dirname(self.path)
@@ -212,19 +217,13 @@ class TemplatePage(BaseTemplatePage):
 
 	def run_pymodule_method(self, method_name):
 		if hasattr(self.pymodule, method_name):
-			try:
-				import inspect
+			import inspect
 
-				method = getattr(self.pymodule, method_name)
-				if inspect.getfullargspec(method).args:
-					return method(self.context)
-				else:
-					return method()
-			except (frappe.PermissionError, frappe.DoesNotExistError, frappe.Redirect):
-				raise
-			except Exception:
-				if not frappe.flags.in_migrate:
-					frappe.errprint(frappe.utils.get_traceback())
+			method = getattr(self.pymodule, method_name)
+			if inspect.getfullargspec(method).args:
+				return method(self.context)
+			else:
+				return method()
 
 	def render_template(self):
 		if self.template_path.endswith("min.js"):
@@ -258,7 +257,7 @@ class TemplatePage(BaseTemplatePage):
 			self.context.colocated_css = self.get_colocated_file(css_path)
 
 	def get_colocated_file(self, path):
-		with io.open(path, "r", encoding="utf-8") as f:
+		with open(path, encoding="utf-8") as f:
 			return f.read()
 
 	def extract_frontmatter(self):
@@ -295,7 +294,7 @@ class TemplatePage(BaseTemplatePage):
 		self.app = "frappe"
 		self.app_path = frappe.get_app_path("frappe")
 		self.path = path
-		self.template_path = "www/{path}.html".format(path=path)
+		self.template_path = f"www/{path}.html"
 
 	def set_missing_values(self):
 		super().set_missing_values()

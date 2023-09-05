@@ -1,18 +1,17 @@
 # Copyright (c) 2021, Frappe Technologies and Contributors
 # See LICENSE
-import unittest
-
 import frappe
 from frappe.core.doctype.doctype.test_doctype import new_doctype
 from frappe.core.doctype.user_permission.user_permission import (
 	add_user_permissions,
 	remove_applicable,
 )
-from frappe.permissions import has_user_permission
+from frappe.permissions import add_permission, has_user_permission
+from frappe.tests.utils import FrappeTestCase
 from frappe.website.doctype.blog_post.test_blog_post import make_test_blog
 
 
-class TestUserPermission(unittest.TestCase):
+class TestUserPermission(FrappeTestCase):
 	def setUp(self):
 		test_users = (
 			"test_bulk_creation_update@example.com",
@@ -176,15 +175,32 @@ class TestUserPermission(unittest.TestCase):
 		self.assertTrue(has_user_permission(frappe.get_doc("Person", parent_record.name), user.name))
 		self.assertTrue(has_user_permission(frappe.get_doc("Person", child_record.name), user.name))
 
-		frappe.db.set_value(
-			"User Permission", {"allow": "Person", "for_value": parent_record.name}, "hide_descendants", 1
+		#  give access of Parent DocType to Blogger role
+		add_permission("Person", "Blogger")
+		frappe.set_user(user.name)
+		visible_names = frappe.get_list(
+			doctype="Person",
+			pluck="person_name",
 		)
-		frappe.cache().delete_value("user_permissions")
+
+		user_permission = frappe.get_doc(
+			"User Permission", {"allow": "Person", "for_value": parent_record.name}
+		)
+		user_permission.hide_descendants = 1
+		user_permission.save(ignore_permissions=True)
 
 		# check if adding perm on a group record with hide_descendants enabled,
 		# hides child records
 		self.assertTrue(has_user_permission(frappe.get_doc("Person", parent_record.name), user.name))
 		self.assertFalse(has_user_permission(frappe.get_doc("Person", child_record.name), user.name))
+
+		visible_names_after_hide_descendants = frappe.get_list(
+			"Person",
+			pluck="person_name",
+		)
+		self.assertEqual(visible_names, ["Child", "Parent"])
+		self.assertEqual(visible_names_after_hide_descendants, ["Parent"])
+		frappe.set_user("Administrator")
 
 	def test_user_perm_on_new_doc_with_field_default(self):
 		"""Test User Perm impact on frappe.new_doc. with *field* default value"""
@@ -278,7 +294,7 @@ def create_user(email, *roles):
 
 	user = frappe.new_doc("User")
 	user.email = email
-	user.first_name = email.split("@")[0]
+	user.first_name = email.split("@", 1)[0]
 
 	if not roles:
 		roles = ("System Manager",)

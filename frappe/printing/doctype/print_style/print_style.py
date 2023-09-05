@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2017, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -7,6 +6,20 @@ from frappe.model.document import Document
 
 
 class PrintStyle(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		css: DF.Code
+		disabled: DF.Check
+		preview: DF.AttachImage | None
+		print_style_name: DF.Data
+		standard: DF.Check
+	# end: auto-generated types
 	def validate(self):
 		if (
 			self.standard == 1

@@ -3,23 +3,67 @@
 
 import datetime
 import inspect
-import unittest
 from math import ceil
 from random import choice
 from unittest.mock import patch
 
 import frappe
+from frappe.core.utils import find
 from frappe.custom.doctype.custom_field.custom_field import create_custom_field
 from frappe.database import savepoint
-from frappe.database.database import Database
+from frappe.database.database import Database, get_query_execution_timeout
+from frappe.database.utils import FallBackDateTimeStr
 from frappe.query_builder import Field
 from frappe.query_builder.functions import Concat_ws
 from frappe.tests.test_query_builder import db_type_is, run_only_if
-from frappe.utils import add_days, cint, now, random_string
+from frappe.tests.utils import FrappeTestCase
+from frappe.utils import add_days, cint, now, random_string, set_request
 from frappe.utils.testutils import clear_custom_fields
 
 
-class TestDB(unittest.TestCase):
+class TestDB(FrappeTestCase):
+	def test_datetime_format(self):
+		now_str = now()
+		self.assertEqual(frappe.db.format_datetime(None), FallBackDateTimeStr)
+		self.assertEqual(frappe.db.format_datetime(now_str), now_str)
+
+	@run_only_if(db_type_is.MARIADB)
+	def test_get_column_type(self):
+		desc_data = frappe.db.sql("desc `tabUser`", as_dict=1)
+		user_name_type = find(desc_data, lambda x: x["Field"] == "name")["Type"]
+		self.assertEqual(frappe.db.get_column_type("User", "name"), user_name_type)
+
+	def test_get_database_size(self):
+		self.assertIsInstance(frappe.db.get_database_size(), (float, int))
+
+	def test_db_statement_execution_timeout(self):
+		frappe.db.set_execution_timeout(2)
+		# Setting 0 means no timeout.
+		self.addCleanup(frappe.db.set_execution_timeout, 0)
+
+		try:
+			savepoint = "statement_timeout"
+			frappe.db.savepoint(savepoint)
+			frappe.db.multisql(
+				{
+					"mariadb": "select sleep(10)",
+					"postgres": "select pg_sleep(10)",
+				}
+			)
+		except Exception as e:
+			self.assertTrue(frappe.db.is_statement_timeout(e), f"exepcted {e} to be timeout error")
+			frappe.db.rollback(save_point=savepoint)
+		else:
+			frappe.db.rollback(save_point=savepoint)
+			self.fail("Long running queries not timing out")
+
+	@patch.dict(frappe.conf, {"http_timeout": 20, "enable_db_statement_timeout": 1})
+	def test_db_timeout_computation(self):
+		set_request(method="GET", path="/")
+		self.assertEqual(get_query_execution_timeout(), 30)
+		frappe.local.request = None
+		self.assertEqual(get_query_execution_timeout(), 0)
+
 	def test_get_value(self):
 		self.assertEqual(frappe.db.get_value("User", {"name": ["=", "Administrator"]}), "Administrator")
 		self.assertEqual(frappe.db.get_value("User", {"name": ["like", "Admin%"]}), "Administrator")
@@ -96,30 +140,8 @@ class TestDB(unittest.TestCase):
 			frappe.db.get_value("DocType", "DocField", order_by="creation desc, modified asc, name", run=0),
 		)
 
-	def test_get_value_limits(self):
-
-		# check both dict and list style filters
-		filters = [{"enabled": 1}, [["enabled", "=", 1]]]
-		for filter in filters:
-			self.assertEqual(1, len(frappe.db.get_values("User", filters=filter, limit=1)))
-			# count of last touched rows as per DB-API 2.0 https://peps.python.org/pep-0249/#rowcount
-			self.assertGreaterEqual(1, cint(frappe.db._cursor.rowcount))
-			self.assertEqual(2, len(frappe.db.get_values("User", filters=filter, limit=2)))
-			self.assertGreaterEqual(2, cint(frappe.db._cursor.rowcount))
-
-			# without limits length == count
-			self.assertEqual(
-				len(frappe.db.get_values("User", filters=filter)), frappe.db.count("User", filter)
-			)
-
-			frappe.db.get_value("User", filters=filter)
-			self.assertGreaterEqual(1, cint(frappe.db._cursor.rowcount))
-
-			frappe.db.exists("User", filter)
-			self.assertGreaterEqual(1, cint(frappe.db._cursor.rowcount))
-
 	def test_escape(self):
-		frappe.db.escape("香港濟生堂製藥有限公司 - IT".encode("utf-8"))
+		frappe.db.escape("香港濟生堂製藥有限公司 - IT".encode())
 
 	def test_get_single_value(self):
 		# setup
@@ -136,7 +158,7 @@ class TestDB(unittest.TestCase):
 		test_inputs = [
 			{"fieldtype": fieldtype, "value": value} for fieldtype, value in values_dict.items()
 		]
-		for fieldtype in values_dict.keys():
+		for fieldtype in values_dict:
 			create_custom_field(
 				"Print Settings",
 				{
@@ -149,7 +171,7 @@ class TestDB(unittest.TestCase):
 		# test
 		for inp in test_inputs:
 			fieldname = f"test_{inp['fieldtype'].lower()}"
-			frappe.db.set_value("Print Settings", "Print Settings", fieldname, inp["value"])
+			frappe.db.set_single_value("Print Settings", fieldname, inp["value"])
 			self.assertEqual(frappe.db.get_single_value("Print Settings", fieldname), inp["value"])
 
 		# teardown
@@ -158,7 +180,7 @@ class TestDB(unittest.TestCase):
 	def test_log_touched_tables(self):
 		frappe.flags.in_migrate = True
 		frappe.flags.touched_tables = set()
-		frappe.db.set_value("System Settings", "System Settings", "backup_limit", 5)
+		frappe.db.set_single_value("System Settings", "backup_limit", 5)
 		self.assertIn("tabSingles", frappe.flags.touched_tables)
 
 		frappe.flags.touched_tables = set()
@@ -182,10 +204,12 @@ class TestDB(unittest.TestCase):
 		self.assertIn("tabToDo", frappe.flags.touched_tables)
 
 		frappe.flags.touched_tables = set()
-		create_custom_field("ToDo", {"label": "ToDo Custom Field"})
-
+		cf = create_custom_field("ToDo", {"label": "ToDo Custom Field"})
 		self.assertIn("tabToDo", frappe.flags.touched_tables)
 		self.assertIn("tabCustom Field", frappe.flags.touched_tables)
+		if cf:
+			cf.delete()
+		frappe.db.commit()
 		frappe.flags.in_migrate = False
 		frappe.flags.touched_tables.clear()
 
@@ -443,6 +467,14 @@ class TestDB(unittest.TestCase):
 			# recover transaction to continue other tests
 			raise Exception
 
+	def test_read_only_errors(self):
+		frappe.db.rollback()
+		frappe.db.begin(read_only=True)
+		self.addCleanup(frappe.db.rollback)
+
+		with self.assertRaises(frappe.InReadOnlyMode):
+			frappe.db.set_value("User", "Administrator", "full_name", "Haxor")
+
 	def test_exists(self):
 		dt, dn = "User", "Administrator"
 		self.assertEqual(frappe.db.exists(dt, dn, cache=True), dn)
@@ -489,15 +521,15 @@ class TestDB(unittest.TestCase):
 		frappe.get_doc(doctype="Note", title="note2", content="someting else").insert()
 
 		# Count with no filtes
-		self.assertEquals((frappe.db.count("Note")), 2)
+		self.assertEqual((frappe.db.count("Note")), 2)
 
 		# simple filters
-		self.assertEquals((frappe.db.count("Note", ["title", "=", "note1"])), 1)
+		self.assertEqual((frappe.db.count("Note", [["title", "=", "note1"]])), 1)
 
 		frappe.get_doc(doctype="Note", title="note3", content="something other").insert()
 
 		# List of list filters with tables
-		self.assertEquals(
+		self.assertEqual(
 			(
 				frappe.db.count(
 					"Note",
@@ -509,16 +541,78 @@ class TestDB(unittest.TestCase):
 
 		frappe.db.rollback()
 
+	@run_only_if(db_type_is.POSTGRES)
+	def test_modify_query(self):
+		from frappe.database.postgres.database import modify_query
+
+		query = "select * from `tabtree b` where lft > 13 and rgt <= 16 and name =1.0 and parent = 4134qrsdc and isgroup = 1.00045"
+		self.assertEqual(
+			"select * from \"tabtree b\" where lft > '13' and rgt <= '16' and name = '1' and parent = 4134qrsdc and isgroup = 1.00045",
+			modify_query(query),
+		)
+
+		query = (
+			'select locate(".io", "frappe.io"), locate("3", cast(3 as varchar)), locate("3", 3::varchar)'
+		)
+		self.assertEqual(
+			'select strpos( "frappe.io", ".io"), strpos( cast(3 as varchar), "3"), strpos( 3::varchar, "3")',
+			modify_query(query),
+		)
+
+	@run_only_if(db_type_is.POSTGRES)
+	def test_modify_values(self):
+		from frappe.database.postgres.database import modify_values
+
+		self.assertEqual(
+			{"a": "23", "b": 23.0, "c": 23.0345, "d": "wow", "e": ("1", "2", "3", "abc")},
+			modify_values({"a": 23, "b": 23.0, "c": 23.0345, "d": "wow", "e": [1, 2, 3, "abc"]}),
+		)
+		self.assertEqual(
+			["23", 23.0, 23.00004345, "wow", ("1", "2", "3", "abc")],
+			modify_values((23, 23.0, 23.00004345, "wow", [1, 2, 3, "abc"])),
+		)
+
+	def test_callbacks(self):
+
+		order_of_execution = []
+
+		def f(val):
+			nonlocal order_of_execution
+			order_of_execution.append(val)
+
+		frappe.db.before_commit.add(lambda: f(0))
+		frappe.db.before_commit.add(lambda: f(1))
+
+		frappe.db.after_commit.add(lambda: f(2))
+		frappe.db.after_commit.add(lambda: f(3))
+
+		frappe.db.before_rollback.add(lambda: f("IGNORED"))
+		frappe.db.before_rollback.add(lambda: f("IGNORED"))
+
+		frappe.db.commit()
+
+		frappe.db.after_commit.add(lambda: f("IGNORED"))
+		frappe.db.after_commit.add(lambda: f("IGNORED"))
+
+		frappe.db.before_rollback.add(lambda: f(4))
+		frappe.db.before_rollback.add(lambda: f(5))
+		frappe.db.after_rollback.add(lambda: f(6))
+		frappe.db.after_rollback.add(lambda: f(7))
+		frappe.db.after_rollback(lambda: f(8))
+
+		frappe.db.rollback()
+
+		self.assertEqual(order_of_execution, list(range(0, 9)))
+
 
 @run_only_if(db_type_is.MARIADB)
-class TestDDLCommandsMaria(unittest.TestCase):
+class TestDDLCommandsMaria(FrappeTestCase):
 	test_table_name = "TestNotes"
 
 	def setUp(self) -> None:
-		frappe.db.commit()
-		frappe.db.sql(
+		frappe.db.sql_ddl(
 			f"""
-			CREATE TABLE `tab{self.test_table_name}` (`id` INT NULL, content TEXT, PRIMARY KEY (`id`));
+			CREATE TABLE IF NOT EXISTS `tab{self.test_table_name}` (`id` INT NULL, content TEXT, PRIMARY KEY (`id`));
 			"""
 		)
 
@@ -542,19 +636,25 @@ class TestDDLCommandsMaria(unittest.TestCase):
 		self.test_table_name = new_table_name
 
 	def test_describe(self) -> None:
-		self.assertEqual(
-			(
+		self.assertSequenceEqual(
+			[
 				("id", "int(11)", "NO", "PRI", None, ""),
 				("content", "text", "YES", "", None, ""),
-			),
+			],
 			frappe.db.describe(self.test_table_name),
 		)
 
 	def test_change_type(self) -> None:
+		def get_table_description():
+			return frappe.db.sql(f"DESC `tab{self.test_table_name}`")
+
+		# try changing from int to varchar
 		frappe.db.change_column_type("TestNotes", "id", "varchar(255)")
-		test_table_description = frappe.db.sql(f"DESC tab{self.test_table_name};")
-		self.assertGreater(len(test_table_description), 0)
-		self.assertIn("varchar(255)", test_table_description[0])
+		self.assertIn("varchar(255)", get_table_description()[0])
+
+		# try changing from varchar to bigint
+		frappe.db.change_column_type("TestNotes", "id", "bigint")
+		self.assertIn("bigint(20)", get_table_description()[0])
 
 	def test_add_index(self) -> None:
 		index_name = "test_index"
@@ -568,9 +668,10 @@ class TestDDLCommandsMaria(unittest.TestCase):
 		self.assertEqual(len(indexs_in_table), 2)
 
 
-class TestDBSetValue(unittest.TestCase):
+class TestDBSetValue(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
+		super().setUpClass()
 		cls.todo1 = frappe.get_doc(doctype="ToDo", description="test_set_value 1").insert()
 		cls.todo2 = frappe.get_doc(doctype="ToDo", description="test_set_value 2").insert()
 
@@ -578,14 +679,12 @@ class TestDBSetValue(unittest.TestCase):
 		value = frappe.db.get_single_value("System Settings", "deny_multiple_sessions")
 		changed_value = not value
 
-		frappe.db.set_value(
-			"System Settings", "System Settings", "deny_multiple_sessions", changed_value
-		)
+		frappe.db.set_single_value("System Settings", "deny_multiple_sessions", changed_value)
 		current_value = frappe.db.get_single_value("System Settings", "deny_multiple_sessions")
 		self.assertEqual(current_value, changed_value)
 
 		changed_value = not current_value
-		frappe.db.set_value("System Settings", None, "deny_multiple_sessions", changed_value)
+		frappe.db.set_single_value("System Settings", "deny_multiple_sessions", changed_value)
 		current_value = frappe.db.get_single_value("System Settings", "deny_multiple_sessions")
 		self.assertEqual(current_value, changed_value)
 
@@ -598,6 +697,11 @@ class TestDBSetValue(unittest.TestCase):
 		frappe.db.set_value("ToDo", self.todo1.name, "description", "test_set_value change 1")
 		updated_value = frappe.db.get_value("ToDo", self.todo1.name, "description")
 		self.assertEqual(updated_value, "test_set_value change 1")
+
+	@patch("frappe.db.set_single_value")
+	def test_set_single_value_with_set_value(self, single_set):
+		frappe.db.set_value("Contact Us Settings", None, "country", "India")
+		single_set.assert_called_once()
 
 	def test_update_single_row_multiple_columns(self):
 		description, status = "Upated by test_update_single_row_multiple_columns", "Closed"
@@ -672,56 +776,33 @@ class TestDBSetValue(unittest.TestCase):
 			frappe.db.get_value("ToDo", todo.name, ["modified", "modified_by"]),
 		)
 
-	def test_for_update(self):
+	def test_set_value(self):
 		self.todo1.reload()
 
-		with patch.object(Database, "sql") as sql_called:
-			frappe.db.set_value(
-				self.todo1.doctype,
-				self.todo1.name,
-				"description",
-				f"{self.todo1.description}-edit by `test_for_update`",
-			)
-			first_query = sql_called.call_args_list[0].args[0]
-			second_query = sql_called.call_args_list[1].args[0]
+		frappe.db.set_value(
+			self.todo1.doctype,
+			self.todo1.name,
+			"description",
+			f"{self.todo1.description}-edit by `test_for_update`",
+		)
+		query = str(frappe.db.last_query)
 
-			self.assertTrue(sql_called.call_count == 2)
-			self.assertTrue("FOR UPDATE" in first_query)
-			if frappe.conf.db_type == "postgres":
-				from frappe.database.postgres.database import modify_query
+		if frappe.conf.db_type == "postgres":
+			from frappe.database.postgres.database import modify_query
 
-				self.assertTrue(modify_query("UPDATE `tabToDo` SET") in second_query)
-			if frappe.conf.db_type == "mariadb":
-				self.assertTrue("UPDATE `tabToDo` SET" in second_query)
+			self.assertTrue(modify_query("UPDATE `tabToDo` SET") in query)
+		if frappe.conf.db_type == "mariadb":
+			self.assertTrue("UPDATE `tabToDo` SET" in query)
 
 	def test_cleared_cache(self):
 		self.todo2.reload()
+		frappe.get_cached_doc(self.todo2.doctype, self.todo2.name)  # init cache
 
-		with patch.object(frappe, "clear_document_cache") as clear_cache:
-			frappe.db.set_value(
-				self.todo2.doctype,
-				self.todo2.name,
-				"description",
-				f"{self.todo2.description}-edit by `test_cleared_cache`",
-			)
-			clear_cache.assert_called()
+		description = f"{self.todo2.description}-edit by `test_cleared_cache`"
 
-	def test_update_alias(self):
-		args = (self.todo1.doctype, self.todo1.name, "description", "Updated by `test_update_alias`")
-		kwargs = {
-			"for_update": False,
-			"modified": None,
-			"modified_by": None,
-			"update_modified": True,
-			"debug": False,
-		}
-
-		self.assertTrue("return self.set_value(" in inspect.getsource(frappe.db.update))
-
-		with patch.object(Database, "set_value") as set_value:
-			frappe.db.update(*args, **kwargs)
-			set_value.assert_called_once()
-			set_value.assert_called_with(*args, **kwargs)
+		frappe.db.set_value(self.todo2.doctype, self.todo2.name, "description", description)
+		cached_doc = frappe.get_cached_doc(self.todo2.doctype, self.todo2.name)
+		self.assertEqual(cached_doc.description, description)
 
 	@classmethod
 	def tearDownClass(cls):
@@ -729,7 +810,7 @@ class TestDBSetValue(unittest.TestCase):
 
 
 @run_only_if(db_type_is.POSTGRES)
-class TestDDLCommandsPost(unittest.TestCase):
+class TestDDLCommandsPost(FrappeTestCase):
 	test_table_name = "TestNotes"
 
 	def setUp(self) -> None:
@@ -760,24 +841,37 @@ class TestDDLCommandsPost(unittest.TestCase):
 		self.test_table_name = new_table_name
 
 	def test_describe(self) -> None:
-		self.assertEqual([("id",), ("content",)], frappe.db.describe(self.test_table_name))
+		self.assertSequenceEqual([("id",), ("content",)], frappe.db.describe(self.test_table_name))
 
 	def test_change_type(self) -> None:
+		from psycopg2.errors import DatatypeMismatch
+
+		def get_table_description():
+			return frappe.db.sql(
+				f"""
+				SELECT
+					table_name,
+					column_name,
+					data_type
+				FROM
+					information_schema.columns
+				WHERE
+					table_name = 'tab{self.test_table_name}'"""
+			)
+
+		# try changing from int to varchar
 		frappe.db.change_column_type(self.test_table_name, "id", "varchar(255)")
-		check_change = frappe.db.sql(
-			f"""
-			SELECT
-				table_name,
-				column_name,
-				data_type
-			FROM
-				information_schema.columns
-			WHERE
-				table_name = 'tab{self.test_table_name}'
-			"""
-		)
-		self.assertGreater(len(check_change), 0)
-		self.assertIn("character varying", check_change[0])
+		self.assertIn("character varying", get_table_description()[0])
+
+		# try changing from varchar to int
+		try:
+			frappe.db.change_column_type(self.test_table_name, "id", "bigint")
+		except DatatypeMismatch:
+			frappe.db.rollback()
+
+		# try changing from varchar to int (using cast)
+		frappe.db.change_column_type(self.test_table_name, "id", "bigint", use_cast=True)
+		self.assertIn("bigint", get_table_description()[0])
 
 	def test_add_index(self) -> None:
 		index_name = "test_index"
@@ -791,34 +885,6 @@ class TestDDLCommandsPost(unittest.TestCase):
 			""",
 		)
 		self.assertEqual(len(indexs_in_table), 1)
-
-	@run_only_if(db_type_is.POSTGRES)
-	def test_modify_query(self):
-		from frappe.database.postgres.database import modify_query
-
-		query = "select * from `tabtree b` where lft > 13 and rgt <= 16 and name =1.0 and parent = 4134qrsdc and isgroup = 1.00045"
-		self.assertEqual(
-			"select * from \"tabtree b\" where lft > '13' and rgt <= '16' and name = '1' and parent = 4134qrsdc and isgroup = 1.00045",
-			modify_query(query),
-		)
-
-		query = (
-			'select locate(".io", "frappe.io"), locate("3", cast(3 as varchar)), locate("3", 3::varchar)'
-		)
-		self.assertEqual(
-			'select strpos( "frappe.io", ".io"), strpos( cast(3 as varchar), "3"), strpos( 3::varchar, "3")',
-			modify_query(query),
-		)
-
-	@run_only_if(db_type_is.POSTGRES)
-	def test_modify_values(self):
-		from frappe.database.postgres.database import modify_values
-
-		self.assertEqual(
-			{"abcd": "23", "efgh": "23", "ijkl": 23.0345, "mnop": "wow"},
-			modify_values({"abcd": 23, "efgh": 23.0, "ijkl": 23.0345, "mnop": "wow"}),
-		)
-		self.assertEqual(["23", "23", 23.00004345, "wow"], modify_values((23, 23.0, 23.00004345, "wow")))
 
 	def test_sequence_table_creation(self):
 		from frappe.core.doctype.doctype.test_doctype import new_doctype
@@ -841,3 +907,58 @@ class TestDDLCommandsPost(unittest.TestCase):
 			)
 
 		dt.delete(ignore_permissions=True)
+
+	def test_is(self):
+		user = frappe.qb.DocType("User")
+		self.assertIn(
+			"is not null", frappe.db.get_values(user, filters={user.name: ("is", "set")}, run=False).lower()
+		)
+		self.assertIn(
+			"is null", frappe.db.get_values(user, filters={user.name: ("is", "not set")}, run=False).lower()
+		)
+
+
+@run_only_if(db_type_is.POSTGRES)
+class TestTransactionManagement(FrappeTestCase):
+	def test_create_proper_transactions(self):
+		def _get_transaction_id():
+			return frappe.db.sql("select txid_current()", pluck=True)
+
+		self.assertEqual(_get_transaction_id(), _get_transaction_id())
+
+		frappe.db.rollback()
+		self.assertEqual(_get_transaction_id(), _get_transaction_id())
+
+		frappe.db.commit()
+		self.assertEqual(_get_transaction_id(), _get_transaction_id())
+
+
+# Treat same DB as replica for tests, a separate connection will be opened
+class TestReplicaConnections(FrappeTestCase):
+	def test_switching_to_replica(self):
+		with patch.dict(frappe.local.conf, {"read_from_replica": 1, "replica_host": "localhost"}):
+
+			def db_id():
+				return id(frappe.local.db)
+
+			write_connection = db_id()
+			read_only_connection = None
+
+			@frappe.read_only()
+			def outer():
+				nonlocal read_only_connection
+				read_only_connection = db_id()
+
+				# A new connection should be opened
+				self.assertNotEqual(read_only_connection, write_connection)
+				inner()
+				# calling nested read only function shouldn't change connection
+				self.assertEqual(read_only_connection, db_id())
+
+			@frappe.read_only()
+			def inner():
+				# calling nested read only function shouldn't change connection
+				self.assertEqual(read_only_connection, db_id())
+
+			outer()
+			self.assertEqual(write_connection, db_id())

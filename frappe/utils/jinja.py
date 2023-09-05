@@ -2,14 +2,24 @@
 # License: MIT. See LICENSE
 def get_jenv():
 	import frappe
-	from frappe.utils.safe_exec import get_safe_globals
 
 	if not getattr(frappe.local, "jenv", None):
 		from jinja2 import DebugUndefined
 		from jinja2.sandbox import SandboxedEnvironment
 
+		from frappe.utils.safe_exec import UNSAFE_ATTRIBUTES, get_safe_globals
+
+		UNSAFE_ATTRIBUTES = UNSAFE_ATTRIBUTES - {"format", "format_map"}
+
+		class FrappeSandboxedEnvironment(SandboxedEnvironment):
+			def is_safe_attribute(self, obj, attr, *args, **kwargs):
+				if attr in UNSAFE_ATTRIBUTES:
+					return False
+
+				return super().is_safe_attribute(obj, attr, *args, **kwargs)
+
 		# frappe will be loaded last, so app templates will get precedence
-		jenv = SandboxedEnvironment(loader=get_jloader(), undefined=DebugUndefined)
+		jenv = FrappeSandboxedEnvironment(loader=get_jloader(), undefined=DebugUndefined)
 		set_filters(jenv)
 
 		jenv.globals.update(get_safe_globals())
@@ -56,11 +66,11 @@ def validate_template(html):
 	try:
 		jenv.from_string(html)
 	except TemplateSyntaxError as e:
-		frappe.msgprint("Line {}: {}".format(e.lineno, e.message))
+		frappe.msgprint(f"Line {e.lineno}: {e.message}")
 		frappe.throw(frappe._("Syntax error in template"))
 
 
-def render_template(template, context, is_path=None, safe_render=True):
+def render_template(template, context=None, is_path=None, safe_render=True):
 	"""Render a template using Jinja
 
 	:param template: path or HTML containing the jinja template
@@ -76,6 +86,9 @@ def render_template(template, context, is_path=None, safe_render=True):
 	if not template:
 		return ""
 
+	if context is None:
+		context = {}
+
 	if is_path or guess_is_path(template):
 		return get_jenv().get_template(template).render(context)
 	else:
@@ -86,7 +99,7 @@ def render_template(template, context, is_path=None, safe_render=True):
 		except TemplateError:
 			throw(
 				title="Jinja Template Error",
-				msg="<pre>{template}</pre><pre>{tb}</pre>".format(template=template, tb=get_traceback()),
+				msg=f"<pre>{template}</pre><pre>{get_traceback()}</pre>",
 			)
 
 
@@ -109,15 +122,16 @@ def get_jloader():
 
 		apps = frappe.get_hooks("template_apps")
 		if not apps:
-			apps = frappe.local.flags.web_pages_apps or frappe.get_installed_apps(sort=True)
-			apps.reverse()
+			apps = list(
+				reversed(frappe.local.flags.web_pages_apps or frappe.get_installed_apps(_ensure_on_bench=True))
+			)
 
 		if "frappe" not in apps:
 			apps.append("frappe")
 
 		frappe.local.jloader = ChoiceLoader(
 			# search for something like app/templates/...
-			[PrefixLoader(dict((app, PackageLoader(app, ".")) for app in apps))]
+			[PrefixLoader({app: PackageLoader(app, ".") for app in apps})]
 			# search for something like templates/...
 			+ [PackageLoader(app, ".") for app in apps]
 		)

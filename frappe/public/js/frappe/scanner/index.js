@@ -37,7 +37,7 @@ frappe.ui.Scanner = class Scanner {
 						try {
 							this.options.on_scan(decodedResult);
 						} catch (error) {
-							console.error(error); // eslint-disable-line
+							console.error(error);
 						}
 					}
 					if (!this.options.multiple) {
@@ -45,14 +45,14 @@ frappe.ui.Scanner = class Scanner {
 						this.hide_dialog();
 					}
 				},
-				errorMessage => { // eslint-disable-line
+				(errorMessage) => {
 					// parse error, ignore it.
 				}
 			)
-			.catch(err => {
+			.catch((err) => {
 				this.is_alive = false;
 				this.hide_dialog();
-				console.error(err); // eslint-disable-line
+				console.error(err);
 			});
 		this.is_alive = true;
 	}
@@ -73,8 +73,8 @@ frappe.ui.Scanner = class Scanner {
 			fields: [
 				{
 					fieldtype: "HTML",
-					fieldname: "scan_area"
-				}
+					fieldname: "scan_area",
+				},
 			],
 			on_page_show: () => {
 				this.$scan_area = dialog.get_field("scan_area").$wrapper;
@@ -84,7 +84,7 @@ frappe.ui.Scanner = class Scanner {
 			},
 			on_hide: () => {
 				this.stop_scan();
-			}
+			},
 		});
 		return dialog;
 	}
@@ -94,8 +94,6 @@ frappe.ui.Scanner = class Scanner {
 	}
 
 	load_lib() {
-		return frappe.require(
-			"/assets/frappe/node_modules/html5-qrcode/dist/html5-qrcode.min.js"
-		);
+		return frappe.require("/assets/frappe/node_modules/html5-qrcode/html5-qrcode.min.js");
 	}
 };

@@ -46,7 +46,7 @@ class BaseTemplatePage(BaseRenderer):
 			and self.context.title
 			and not self.context.title.startswith(self.context.title_prefix)
 		):
-			self.context.title = "{0} - {1}".format(self.context.title_prefix, self.context.title)
+			self.context.title = f"{self.context.title_prefix} - {self.context.title}"
 
 	def set_missing_values(self):
 		# set using frappe.respond_as_web_page
@@ -64,7 +64,9 @@ class BaseTemplatePage(BaseRenderer):
 			self.context.url_prefix += "/"
 
 		self.context.path = self.path
-		self.context.pathname = frappe.local.path if hasattr(frappe, "local") else self.path
+		self.context.pathname = (
+			getattr(frappe.local, "path", None) if hasattr(frappe, "local") else self.path
+		)
 
 	def update_website_context(self):
 		# apply context from hooks

@@ -7,6 +7,21 @@ from frappe.model.document import Document
 
 
 class PrintFormatFieldTemplate(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		document_type: DF.Link
+		field: DF.Data | None
+		module: DF.Link | None
+		standard: DF.Check
+		template: DF.Code | None
+		template_file: DF.Data | None
+	# end: auto-generated types
 	def validate(self):
 		if self.standard and not (frappe.conf.developer_mode or frappe.flags.in_patch):
 			frappe.throw(_("Enable developer mode to create a standard Print Template"))
@@ -27,7 +42,7 @@ class PrintFormatFieldTemplate(Document):
 		filters = {"document_type": self.document_type, "field": self.field}
 		if not self.is_new():
 			filters.update({"name": ("!=", self.name)})
-		result = frappe.db.get_all("Print Format Field Template", filters=filters, limit=1)
+		result = frappe.get_all("Print Format Field Template", filters=filters, limit=1)
 		if result:
 			frappe.throw(
 				_("A template already exists for field {0} of {1}").format(

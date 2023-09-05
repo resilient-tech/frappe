@@ -3,9 +3,9 @@ import Widget from "./base_widget.js";
 frappe.provide("frappe.utils");
 
 export default class OnboardingWidget extends Widget {
-
 	async refresh() {
-		this.new && await this.get_onboarding_data();
+		frappe.utils.load_video_player();
+		this.new && (await this.get_onboarding_data());
 		this.set_title();
 		this.set_actions();
 		this.set_body();
@@ -14,7 +14,7 @@ export default class OnboardingWidget extends Widget {
 
 	get_config() {
 		return {
-			label: this.onboarding_name
+			label: this.onboarding_name,
 		};
 	}
 
@@ -33,11 +33,17 @@ export default class OnboardingWidget extends Widget {
 			this.add_step(step, index);
 		});
 
-		this.show_step(this.steps[0]);
+		let first_incomplete_step = this.steps.findIndex((s) => !s.is_skipped && !s.is_complete);
+
+		if (first_incomplete_step == -1) {
+			first_incomplete_step = 0;
+		}
+
+		this.show_step(this.steps[first_incomplete_step]);
 	}
 
 	add_step(step, index) {
-		let status = 'pending';
+		let status = "pending";
 
 		if (step.is_skipped) status = "skipped";
 		if (step.is_complete) status = "complete";
@@ -45,8 +51,8 @@ export default class OnboardingWidget extends Widget {
 		let $step = $(`<a class="onboarding-step ${status}">
 				<div class="step-title">
 					<div class="step-index step-pending">${__(index + 1)}</div>
-					<div class="step-index step-skipped">${frappe.utils.icon('tick', 'xs')}</div>
-					<div class="step-index step-complete">${frappe.utils.icon('tick', 'xs')}</div>
+					<div class="step-index step-skipped">${frappe.utils.icon("tick", "xs")}</div>
+					<div class="step-index step-complete">${frappe.utils.icon("tick", "xs")}</div>
 					<div>${__(step.title)}</div>
 				</div>
 			</a>`);
@@ -55,9 +61,7 @@ export default class OnboardingWidget extends Widget {
 
 		// Add skip button
 		if (!step.is_complete && !step.is_skipped) {
-			let skip_html = $(
-				`<div class="step-skip">${__('Skip')}</div>`
-			);
+			let skip_html = $(`<div class="step-skip">${__("Skip")}</div>`);
 
 			skip_html.appendTo($step);
 			skip_html.on("click", () => {
@@ -99,60 +103,82 @@ export default class OnboardingWidget extends Widget {
 		const toggle_content = () => {
 			this.step_body.empty();
 			this.step_footer.empty();
-
-			this.step_body.html(
-				step.description ?
-					frappe.markdown(step.description)
-					: `<h1>${step.title}</h1>`
-			);
+			set_description();
 
 			if (step.intro_video_url) {
-				$(`<button class="btn btn-primary btn-sm">${__('Watch Tutorial')}</button>`)
+				$(`<button class="btn btn-primary btn-sm">${__("Watch Tutorial")}</button>`)
 					.appendTo(this.step_footer)
-					.on('click', toggle_video);
+					.on("click", toggle_video);
 			} else {
-				$(`<button class="btn btn-primary btn-sm">${__(step.action_label || step.action)}</button>`)
+				$(
+					`<button class="btn btn-primary btn-sm">${__(
+						step.action_label || step.action
+					)}</button>`
+				)
 					.appendTo(this.step_footer)
-					.on('click', () => actions[step.action](step));
+					.on("click", () => actions[step.action](step));
 			}
+		};
+
+		const set_description = () => {
+			let content = step.description
+				? frappe.markdown(step.description)
+				: `<h1>${__(step.title)}</h1>`;
+
+			if (step.action === "Create Entry") {
+				// add a secondary action to view list
+				content += `<p>
+					<a href='/app/${frappe.router.slug(step.reference_document)}'>
+						${__("Show {0} List", [__(step.reference_document)])}</a>
+				</p>`;
+			}
+
+			this.step_body.html(content);
 		};
 
 		const toggle_video = () => {
 			this.step_body.empty();
 			this.step_footer.empty();
 
-			const video = $(`<div class="video-player" data-plyr-provider="youtube" data-plyr-embed-id="${step.intro_video_url}"></div>`);
+			const video = $(
+				`<div class="video-player" data-plyr-provider="youtube" data-plyr-embed-id="${step.intro_video_url}"></div>`
+			);
 			video.appendTo(this.step_body);
 			let plyr = new frappe.Plyr(video[0], {
 				hideControls: true,
 				resetOnEnd: true,
 			});
 
-			$(`<button class="btn btn-primary btn-sm">${__(step.action_label || step.action)}</button>`)
+			$(
+				`<button class="btn btn-primary btn-sm">${__(
+					step.action_label || step.action
+				)}</button>`
+			)
 				.appendTo(this.step_footer)
-				.on('click', () => {
+				.on("click", () => {
 					plyr.pause();
 					actions[step.action](step);
 				});
 
 			// Fire only once, on hashchange
-			$(window).one('hashchange', () => {
+			$(window).one("hashchange", () => {
 				plyr.pause();
 			});
 
-			$(`<button class="btn btn-secondary ml-2 btn-sm">${__('Back')}</button>`)
+			$(`<button class="btn btn-secondary ml-2 btn-sm">${__("Back")}</button>`)
 				.appendTo(this.step_footer)
-				.on('click', toggle_content);
+				.on("click", toggle_content);
 		};
 
 		toggle_content();
-		// toggle_video();
 	}
 
 	go_to_page(step) {
 		this.mark_complete(step);
 		frappe.set_route(step.path).then(() => {
-			let message = step.callback_message || __("You can continue with the onboarding after exploring this page");
+			let message =
+				step.callback_message ||
+				__("You can continue with the onboarding after exploring this page");
 			let title = step.callback_title || __("Awesome Work");
 
 			let msg_dialog = frappe.msgprint({
@@ -222,7 +248,7 @@ export default class OnboardingWidget extends Widget {
 			const on_finish = () => {
 				let msg_dialog = frappe.msgprint({
 					message: __("Let's take you back to onboarding"),
-					title: __("Great Job"),
+					title: __("Onboarding complete"),
 					primary_action: {
 						action: () => {
 							frappe.set_route(current_route).then(() => {
@@ -235,9 +261,7 @@ export default class OnboardingWidget extends Widget {
 				});
 			};
 			const tour_name = step.form_tour;
-			frm.tour
-				.init({ tour_name, on_finish })
-				.then(() => frm.tour.start());
+			frm.tour.init({ tour_name, on_finish }).then(() => frm.tour.start());
 		};
 
 		frappe.set_route(route);
@@ -265,7 +289,7 @@ export default class OnboardingWidget extends Widget {
 
 			if (success) {
 				args.message = __("Let's take you back to onboarding");
-				args.title = __("Looks Great");
+				args.title = __("Action Complete");
 				args.primary_action = {
 					action: () => {
 						frappe.set_route(current_route).then(() => {
@@ -278,7 +302,7 @@ export default class OnboardingWidget extends Widget {
 				custom_onhide = () => args.primary_action.action();
 			} else {
 				args.message = __("Looks like you didn't change the value");
-				args.title = __("Oops");
+				args.title = __("Try Again");
 				args.secondary_action = {
 					action: () => frappe.set_route(current_route),
 					label: __("Go Back"),
@@ -314,7 +338,7 @@ export default class OnboardingWidget extends Widget {
 			const on_finish = () => {
 				frappe.msgprint({
 					message: __("Awesome, now try making an entry yourself"),
-					title: __("Great"),
+					title: __("Document Saved"),
 					primary_action: {
 						action: () => {
 							frappe.set_route(current_route).then(() => {
@@ -322,7 +346,7 @@ export default class OnboardingWidget extends Widget {
 							});
 						},
 						label: __("Continue"),
-					}
+					},
 				});
 
 				frappe.msg_dialog.custom_onhide = () => {
@@ -330,15 +354,13 @@ export default class OnboardingWidget extends Widget {
 				};
 			};
 			const tour_name = step.form_tour;
-			frm.tour
-				.init({ tour_name, on_finish })
-				.then(() => frm.tour.start());
+			frm.tour.init({ tour_name, on_finish }).then(() => frm.tour.start());
 		};
 
 		let callback = () => {
 			frappe.msgprint({
-				message: __("You're doing great, let's take you back to the onboarding page."),
-				title: __("Good Work 🎉"),
+				message: __("Let's take you back to onboarding"),
+				title: __("Action Complete"),
 				primary_action: {
 					action: () => {
 						frappe.set_route(current_route).then(() => {
@@ -358,7 +380,7 @@ export default class OnboardingWidget extends Widget {
 			frappe.route_hooks.after_save = () => {
 				frappe.msgprint({
 					message: __("Submit this document to complete this step."),
-					title: __("Great")
+					title: __("Document Saved"),
 				});
 			};
 			frappe.route_hooks.after_submit = callback;
@@ -366,7 +388,7 @@ export default class OnboardingWidget extends Widget {
 			frappe.route_hooks.after_save = callback;
 		}
 
-		frappe.set_route('Form', step.reference_document, docname);
+		frappe.set_route("Form", step.reference_document, docname);
 	}
 
 	show_quick_entry(step) {
@@ -377,7 +399,7 @@ export default class OnboardingWidget extends Widget {
 				if (frappe.get_route_str() != current_route) {
 					let success_dialog = frappe.msgprint({
 						message: __("Let's take you back to onboarding"),
-						title: __("Looks Great"),
+						title: __("Document Saved"),
 						primary_action: {
 							action: () => {
 								success_dialog.hide();
@@ -395,10 +417,9 @@ export default class OnboardingWidget extends Widget {
 						});
 					};
 				} else {
-					frappe.msgprint({
-						message: __("Let us continue with the onboarding"),
-						title: __("Looks Great")
-					});
+					frappe.show_alert(
+						__("Document Saved") + "<br>" + __("Let us continue with the onboarding")
+					);
 					this.mark_complete(step);
 				}
 			},
@@ -423,6 +444,7 @@ export default class OnboardingWidget extends Widget {
 		};
 
 		this.update_step_status(step, "is_complete", 1, callback);
+		this.activate_next_step(step);
 	}
 
 	skip_step(step) {
@@ -436,6 +458,16 @@ export default class OnboardingWidget extends Widget {
 		};
 
 		this.update_step_status(step, "is_skipped", 1, callback);
+		this.activate_next_step(step);
+	}
+
+	activate_next_step(step) {
+		let current_step_index = this.steps.findIndex((s) => s == step);
+		let next_step = this.steps[current_step_index + 1];
+
+		if (!next_step) return;
+
+		this.show_step(next_step);
 	}
 
 	update_step_status(step, status, value, callback) {
@@ -474,8 +506,7 @@ export default class OnboardingWidget extends Widget {
 	show_success() {
 		let success_message = this.success || __("You seem good to go!");
 		let success_state_image =
-			this.success_state_image ||
-			"/assets/frappe/images/ui-states/success-color.png";
+			this.success_state_image || "/assets/frappe/images/ui-states/success-color.png";
 		let documentation = "";
 		if (this.docs_url) {
 			documentation = __(
@@ -488,11 +519,11 @@ export default class OnboardingWidget extends Widget {
 					<img src="${success_state_image}" alt="Success State" class="zoom-in success-state">
 					<h3>${success_message}</h3>
 					<div class="text-muted">${documentation}</div>
-					<button class="btn btn-primary btn-sm">${__('Continue')}</button>
+					<button class="btn btn-primary btn-sm">${__("Continue")}</button>
 			</div>
 		`);
 
-		success.find('.btn').on('click', () => this.delete());
+		success.find(".btn").on("click", () => this.delete());
 
 		this.step_preview.empty();
 		success.appendTo(this.step_preview);
@@ -510,9 +541,7 @@ export default class OnboardingWidget extends Widget {
 	is_dismissed() {
 		if (this.in_customize_mode) return false;
 
-		let dismissed = JSON.parse(
-			localStorage.getItem("dismissed-onboarding") || "{}"
-		);
+		let dismissed = JSON.parse(localStorage.getItem("dismissed-onboarding") || "{}");
 		if (Object.keys(dismissed).includes(this.title)) {
 			let last_hidden = new Date(dismissed[this.title]);
 			let today = new Date();
@@ -527,20 +556,20 @@ export default class OnboardingWidget extends Widget {
 
 		this.action_area.empty();
 		const dismiss = $(
-			`<div class="small" style="cursor:pointer;">${__('Dismiss', null, 'Stop showing the onboarding widget.')}</div>`
+			`<div class="small" style="cursor:pointer;">${__(
+				"Dismiss",
+				null,
+				"Stop showing the onboarding widget."
+			)}</div>`
 		);
 		dismiss.on("click", () => {
-			let dismissed = JSON.parse(
-				localStorage.getItem("dismissed-onboarding") || "{}"
-			);
+			let dismissed = JSON.parse(localStorage.getItem("dismissed-onboarding") || "{}");
 			dismissed[this.title] = frappe.datetime.now_datetime();
 
-			localStorage.setItem(
-				"dismissed-onboarding",
-				JSON.stringify(dismissed)
-			);
+			localStorage.setItem("dismissed-onboarding", JSON.stringify(dismissed));
 			this.delete(true, true);
-			this.widget.closest('.ce-block').hide();
+			this.widget.closest(".ce-block").hide();
+			frappe.telemetry.capture("dismissed_" + frappe.scrub(this.title), "frappe_onboarding");
 		});
 		dismiss.appendTo(this.action_area);
 	}
@@ -548,7 +577,7 @@ export default class OnboardingWidget extends Widget {
 	get_onboarding_data() {
 		return frappe.model
 			.with_doc("Module Onboarding", this.onboarding_name)
-			.then(onboarding_doc => {
+			.then((onboarding_doc) => {
 				if (onboarding_doc) {
 					this.onboarding_doc = onboarding_doc;
 					this.label = onboarding_doc.label;
@@ -561,7 +590,7 @@ export default class OnboardingWidget extends Widget {
 						"frappe.desk.doctype.onboarding_step.onboarding_step.get_onboarding_steps";
 					return frappe
 						.xcall(method, { ob_steps: onboarding_doc.steps })
-						.then(steps => {
+						.then((steps) => {
 							this.steps = steps;
 						});
 				}
@@ -569,17 +598,19 @@ export default class OnboardingWidget extends Widget {
 	}
 
 	async get_first_document(doctype) {
-		const { message } = await frappe.db.get_value('Form Tour', { 'reference_doctype': doctype }, ["first_document"]);
+		const { message } = await frappe.db.get_value(
+			"Form Tour",
+			{ reference_doctype: doctype },
+			["first_document"]
+		);
 		let docname;
 
 		if (message.first_document) {
-			await frappe.db.get_list(doctype, { order_by: "creation" }).then(res => {
-				if (Array.isArray(res) && res.length)
-					docname = res[0].name;
+			await frappe.db.get_list(doctype, { order_by: "creation" }).then((res) => {
+				if (Array.isArray(res) && res.length) docname = res[0].name;
 			});
 		}
 
-
-		return docname || 'new';
+		return docname || "new";
 	}
 }

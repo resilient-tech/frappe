@@ -19,12 +19,36 @@ STANDARD_ROLES = ("Administrator", "System Manager", "Script Manager", "All", "G
 
 
 class Role(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		bulk_actions: DF.Check
+		dashboard: DF.Check
+		desk_access: DF.Check
+		disabled: DF.Check
+		form_sidebar: DF.Check
+		home_page: DF.Data | None
+		is_custom: DF.Check
+		list_sidebar: DF.Check
+		notifications: DF.Check
+		restrict_to_domain: DF.Link | None
+		role_name: DF.Data
+		search_bar: DF.Check
+		timeline: DF.Check
+		two_factor_auth: DF.Check
+		view_switcher: DF.Check
+	# end: auto-generated types
 	def before_rename(self, old, new, merge=False):
 		if old in STANDARD_ROLES:
 			frappe.throw(frappe._("Standard roles cannot be renamed"))
 
 	def after_insert(self):
-		frappe.cache().hdel("roles", "Administrator")
+		frappe.cache.hdel("roles", "Administrator")
 
 	def validate(self):
 		if self.disabled:
@@ -64,10 +88,14 @@ class Role(Document):
 					user.save()
 
 
-def get_info_based_on_role(role, field="email"):
+def get_info_based_on_role(role, field="email", ignore_permissions=False):
 	"""Get information of all users that have been assigned this role"""
 	users = frappe.get_list(
-		"Has Role", filters={"role": role}, parent_doctype="User", fields=["parent as user_name"]
+		"Has Role",
+		filters={"role": role, "parenttype": "User"},
+		parent_doctype="User",
+		fields=["parent as user_name"],
+		ignore_permissions=ignore_permissions,
 	)
 
 	return get_user_info(users, field)
@@ -96,7 +124,7 @@ def get_users(role):
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def role_query(doctype, txt, searchfield, start, page_len, filters):
-	report_filters = [["Role", "name", "like", "%{}%".format(txt)], ["Role", "is_custom", "=", 0]]
+	report_filters = [["Role", "name", "like", f"%{txt}%"], ["Role", "is_custom", "=", 0]]
 	if filters and isinstance(filters, list):
 		report_filters.extend(filters)
 

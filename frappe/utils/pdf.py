@@ -1,5 +1,6 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
+import contextlib
 import io
 import os
 import re
@@ -8,12 +9,13 @@ from distutils.version import LooseVersion
 
 import pdfkit
 from bs4 import BeautifulSoup
-from PyPDF2 import PdfFileReader, PdfFileWriter
+from pypdf import PdfReader, PdfWriter
 
 import frappe
 from frappe import _
 from frappe.utils import scrub_urls
 from frappe.utils.jinja_globals import bundled_asset, is_rtl
+from frappe.utils.logger import pipe_to_log
 
 PDF_CONTENT_ERRORS = [
 	"ContentNotFoundError",
@@ -22,8 +24,59 @@ PDF_CONTENT_ERRORS = [
 	"RemoteHostClosedError",
 ]
 
+logger = frappe.logger("wkhtmltopdf", max_size=100000, file_count=3)
+logger.setLevel("INFO")
 
-def get_pdf(html, options=None, output=None):
+
+def pdf_header_html(soup, head, content, styles, html_id, css):
+	return frappe.render_template(
+		"templates/print_formats/pdf_header_footer.html",
+		{
+			"head": head,
+			"content": content,
+			"styles": styles,
+			"html_id": html_id,
+			"css": css,
+			"lang": frappe.local.lang,
+			"layout_direction": "rtl" if is_rtl() else "ltr",
+		},
+	)
+
+
+def pdf_body_html(template, args, **kwargs):
+	try:
+		return template.render(args, filters={"len": len})
+	except Exception as e:
+		# Guess line number ?
+		frappe.throw(
+			_("Error in print format on line {0}: {1}").format(
+				_guess_template_error_line_number(template), e
+			),
+			exc=frappe.PrintFormatError,
+			title=_("Print Format Error"),
+		)
+
+
+def _guess_template_error_line_number(template) -> int | None:
+	"""Guess line on which exception occured from current traceback."""
+	with contextlib.suppress(Exception):
+		import sys
+		import traceback
+
+		_, _, tb = sys.exc_info()
+
+		for frame in reversed(traceback.extract_tb(tb)):
+			if template.filename in frame.filename:
+				return frame.lineno
+
+
+def pdf_footer_html(soup, head, content, styles, html_id, css):
+	return pdf_header_html(
+		soup=soup, head=head, content=content, styles=styles, html_id=html_id, css=css
+	)
+
+
+def get_pdf(html, options=None, output: PdfWriter | None = None):
 	html = scrub_urls(html)
 	html, options = prepare_options(html, options)
 
@@ -34,12 +87,16 @@ def get_pdf(html, options=None, output=None):
 		options.update({"disable-smart-shrinking": ""})
 
 	try:
+		# wkhtmltopdf writes the pdf to stdout and errors to stderr
+		# pdfkit v1.0.0 writes the pdf to file or returns it
+		# stderr is written to sys.stdout if verbose=True is supplied
 		# Set filename property to false, so no file is actually created
-		filedata = pdfkit.from_string(html, False, options=options or {})
+		# defaults to redirecting stdout
+		with pipe_to_log(logger.info):
+			filedata = pdfkit.from_string(html, False, options=options or {}, verbose=True)
 
-		# https://pythonhosted.org/PyPDF2/PdfFileReader.html
-		# create in-memory binary streams from filedata and create a PdfFileReader object
-		reader = PdfFileReader(io.BytesIO(filedata))
+		# create in-memory binary streams from filedata and create a PdfReader object
+		reader = PdfReader(io.BytesIO(filedata))
 	except OSError as e:
 		if any([error in str(e) for error in PDF_CONTENT_ERRORS]):
 			if not filedata:
@@ -47,8 +104,8 @@ def get_pdf(html, options=None, output=None):
 				frappe.throw(_("PDF generation failed because of broken image links"))
 
 			# allow pdfs with missing images if file got created
-			if output:  # output is a PdfFileWriter object
-				output.appendPagesFromReader(reader)
+			if output:
+				output.append_pages_from_reader(reader)
 		else:
 			raise
 	finally:
@@ -58,11 +115,11 @@ def get_pdf(html, options=None, output=None):
 		password = options["password"]
 
 	if output:
-		output.appendPagesFromReader(reader)
+		output.append_pages_from_reader(reader)
 		return output
 
-	writer = PdfFileWriter()
-	writer.appendPagesFromReader(reader)
+	writer = PdfWriter()
+	writer.append_pages_from_reader(reader)
 
 	if "password" in options:
 		writer.encrypt(password)
@@ -94,7 +151,6 @@ def prepare_options(html, options):
 			"print-media-type": None,
 			"background": None,
 			"images": None,
-			"quiet": None,
 			# 'no-outline': None,
 			"encoding": "UTF-8",
 			# 'load-error-handling': 'ignore'
@@ -135,13 +191,13 @@ def get_cookie_options():
 	options = {}
 	if frappe.session and frappe.session.sid and hasattr(frappe.local, "request"):
 		# Use wkhtmltopdf's cookie-jar feature to set cookies and restrict them to host domain
-		cookiejar = "/tmp/{}.jar".format(frappe.generate_hash())
+		cookiejar = f"/tmp/{frappe.generate_hash()}.jar"
 
 		# Remove port from request.host
 		# https://werkzeug.palletsprojects.com/en/0.16.x/wrappers/#werkzeug.wrappers.BaseRequest.host
 		domain = frappe.utils.get_host_name().split(":", 1)[0]
 		with open(cookiejar, "w") as f:
-			f.write("sid={}; Domain={};\n".format(frappe.session.sid, domain))
+			f.write(f"sid={frappe.session.sid}; Domain={domain};\n")
 
 		options["cookie-jar"] = cookiejar
 
@@ -173,7 +229,7 @@ def read_options_from_html(html):
 			match = pattern.findall(html)
 			if match:
 				options[attr] = str(match[-1][3]).strip()
-		except:
+		except Exception:
 			pass
 
 	return str(soup), options
@@ -197,21 +253,19 @@ def prepare_header_footer(soup):
 				tag.extract()
 
 			toggle_visible_pdf(content)
-			html = frappe.render_template(
-				"templates/print_formats/pdf_header_footer.html",
-				{
-					"head": head,
-					"content": content,
-					"styles": styles,
-					"html_id": html_id,
-					"css": css,
-					"lang": frappe.local.lang,
-					"layout_direction": "rtl" if is_rtl() else "ltr",
-				},
+			id_map = {"header-html": "pdf_header_html", "footer-html": "pdf_footer_html"}
+			hook_func = frappe.get_hooks(id_map.get(html_id))
+			html = frappe.get_attr(hook_func[-1])(
+				soup=soup,
+				head=head,
+				content=content,
+				styles=styles,
+				html_id=html_id,
+				css=css,
 			)
 
 			# create temp file
-			fname = os.path.join("/tmp", "frappe-pdf-{0}.html".format(frappe.generate_hash()))
+			fname = os.path.join("/tmp", f"frappe-pdf-{frappe.generate_hash()}.html")
 			with open(fname, "wb") as f:
 				f.write(html.encode("utf-8"))
 
@@ -243,13 +297,13 @@ def toggle_visible_pdf(soup):
 
 
 def get_wkhtmltopdf_version():
-	wkhtmltopdf_version = frappe.cache().hget("wkhtmltopdf_version", None)
+	wkhtmltopdf_version = frappe.cache.hget("wkhtmltopdf_version", None)
 
 	if not wkhtmltopdf_version:
 		try:
 			res = subprocess.check_output(["wkhtmltopdf", "--version"])
 			wkhtmltopdf_version = res.decode("utf-8").split(" ")[1]
-			frappe.cache().hset("wkhtmltopdf_version", None, wkhtmltopdf_version)
+			frappe.cache.hset("wkhtmltopdf_version", None, wkhtmltopdf_version)
 		except Exception:
 			pass
 

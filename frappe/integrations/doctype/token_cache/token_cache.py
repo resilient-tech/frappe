@@ -1,21 +1,40 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
 from datetime import datetime, timedelta
 
+import pytz
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, cstr
+from frappe.utils import cint, cstr, get_system_timezone
 
 
 class TokenCache(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.integrations.doctype.oauth_scope.oauth_scope import OAuthScope
+		from frappe.types import DF
+
+		access_token: DF.Password | None
+		connected_app: DF.Link | None
+		expires_in: DF.Int
+		provider_name: DF.Data | None
+		refresh_token: DF.Password | None
+		scopes: DF.Table[OAuthScope]
+		state: DF.Data | None
+		success_uri: DF.Data | None
+		token_type: DF.Data | None
+		user: DF.Link | None
+	# end: auto-generated types
 	def get_auth_header(self):
 		if self.access_token:
-			headers = {"Authorization": "Bearer " + self.get_password("access_token")}
-			return headers
-
+			return {"Authorization": "Bearer " + self.get_password("access_token")}
 		raise frappe.exceptions.DoesNotExistError
 
 	def update_data(self, data):
@@ -51,16 +70,20 @@ class TokenCache(Document):
 		return self
 
 	def get_expires_in(self):
-		expiry_time = frappe.utils.get_datetime(self.modified) + timedelta(self.expires_in)
-		return (datetime.now() - expiry_time).total_seconds()
+		system_timezone = pytz.timezone(get_system_timezone())
+		modified = frappe.utils.get_datetime(self.modified)
+		modified = system_timezone.localize(modified)
+		expiry_utc = modified.astimezone(pytz.utc) + timedelta(seconds=self.expires_in)
+		now_utc = datetime.utcnow().replace(tzinfo=pytz.utc)
+		return cint((expiry_utc - now_utc).total_seconds())
 
 	def is_expired(self):
 		return self.get_expires_in() < 0
 
 	def get_json(self):
 		return {
-			"access_token": self.get_password("access_token", ""),
-			"refresh_token": self.get_password("refresh_token", ""),
+			"access_token": self.get_password("access_token", False),
+			"refresh_token": self.get_password("refresh_token", False),
 			"expires_in": self.get_expires_in(),
 			"token_type": self.token_type,
 		}

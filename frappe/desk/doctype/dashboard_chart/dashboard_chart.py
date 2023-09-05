@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -7,13 +6,14 @@ import json
 
 import frappe
 from frappe import _
-from frappe.boot import get_allowed_reports
+from frappe.boot import get_allowed_report_names
 from frappe.config import get_modules_from_all_apps_for_user
 from frappe.model.document import Document
 from frappe.model.naming import append_number_if_name_exists
 from frappe.modules.export_file import export_to_files
-from frappe.utils import cint, get_datetime, getdate, now_datetime, nowdate
+from frappe.utils import cint, get_datetime, getdate, has_common, now_datetime, nowdate
 from frappe.utils.dashboard import cache_source
+from frappe.utils.data import format_date
 from frappe.utils.dateutils import (
 	get_dates_from_timegrain,
 	get_from_date_from_timespan,
@@ -40,10 +40,7 @@ def get_permission_query_conditions(user):
 	allowed_doctypes = [
 		frappe.db.escape(doctype) for doctype in frappe.permissions.get_doctypes_with_read()
 	]
-	allowed_reports = [
-		frappe.db.escape(key) if type(key) == str else key.encode("UTF8")
-		for key in get_allowed_reports()
-	]
+	allowed_reports = [frappe.db.escape(report) for report in get_allowed_report_names()]
 	allowed_modules = [
 		frappe.db.escape(module.get("module_name")) for module in get_modules_from_all_apps_for_user()
 	]
@@ -83,14 +80,16 @@ def has_permission(doc, ptype, user):
 		return True
 
 	if doc.chart_type == "Report":
-		allowed_reports = [
-			key if type(key) == str else key.encode("UTF8") for key in get_allowed_reports()
-		]
-		if doc.report_name in allowed_reports:
+		if doc.report_name in get_allowed_report_names():
 			return True
 	else:
 		allowed_doctypes = frappe.permissions.get_doctypes_with_read()
 		if doc.document_type in allowed_doctypes:
+			return True
+
+	if doc.roles:
+		allowed = [d.role for d in doc.roles]
+		if has_common(roles, allowed):
 			return True
 
 	return False
@@ -211,22 +210,24 @@ def get_chart_config(chart, filters, timespan, timegrain, from_date, to_date):
 
 	data = frappe.db.get_list(
 		doctype,
-		fields=["{} as _unit".format(datefield), "SUM({})".format(value_field), "COUNT(*)"],
+		fields=[f"{datefield} as _unit", f"SUM({value_field})", "COUNT(*)"],
 		filters=filters,
 		group_by="_unit",
 		order_by="_unit asc",
 		as_list=True,
-		ignore_ifnull=True,
 	)
 
 	result = get_result(data, timegrain, from_date, to_date, chart.chart_type)
 
-	chart_config = {
-		"labels": [get_period(r[0], timegrain) for r in result],
+	return {
+		"labels": [
+			format_date(get_period(r[0], timegrain), parse_day_first=True)
+			if timegrain in ("Daily", "Weekly")
+			else get_period(r[0], timegrain)
+			for r in result
+		],
 		"datasets": [{"name": chart.name, "values": [r[1] for r in result]}],
 	}
-
-	return chart_config
 
 
 def get_heatmap_chart_config(chart, filters, heatmap_year):
@@ -238,16 +239,16 @@ def get_heatmap_chart_config(chart, filters, heatmap_year):
 	year_start_date = datetime.date(year, 1, 1).strftime("%Y-%m-%d")
 	next_year_start_date = datetime.date(year + 1, 1, 1).strftime("%Y-%m-%d")
 
-	filters.append([doctype, datefield, ">", "{date}".format(date=year_start_date), False])
-	filters.append([doctype, datefield, "<", "{date}".format(date=next_year_start_date), False])
+	filters.append([doctype, datefield, ">", f"{year_start_date}", False])
+	filters.append([doctype, datefield, "<", f"{next_year_start_date}", False])
 
 	if frappe.db.db_type == "mariadb":
-		timestamp_field = "unix_timestamp({datefield})".format(datefield=datefield)
+		timestamp_field = f"unix_timestamp({datefield})"
 	else:
-		timestamp_field = "extract(epoch from timestamp {datefield})".format(datefield=datefield)
+		timestamp_field = f"extract(epoch from timestamp {datefield})"
 
 	data = dict(
-		frappe.db.get_all(
+		frappe.get_all(
 			doctype,
 			fields=[
 				timestamp_field,
@@ -256,18 +257,17 @@ def get_heatmap_chart_config(chart, filters, heatmap_year):
 				),
 			],
 			filters=filters,
-			group_by="date({datefield})".format(datefield=datefield),
+			group_by=f"date({datefield})",
 			as_list=1,
-			order_by="{datefield} asc".format(datefield=datefield),
+			order_by=f"{datefield} asc",
 			ignore_ifnull=True,
 		)
 	)
 
-	chart_config = {
+	return {
 		"labels": [],
 		"dataPoints": data,
 	}
-	return chart_config
 
 
 def get_group_by_chart_config(chart, filters):
@@ -277,34 +277,24 @@ def get_group_by_chart_config(chart, filters):
 	group_by_field = chart.group_by_based_on
 	doctype = chart.document_type
 
-	data = frappe.db.get_list(
+	data = frappe.get_list(
 		doctype,
 		fields=[
-			"{} as name".format(group_by_field),
-			"{aggregate_function}({value_field}) as count".format(
-				aggregate_function=aggregate_function, value_field=value_field
-			),
+			f"{group_by_field} as name",
+			f"{aggregate_function}({value_field}) as count",
 		],
 		filters=filters,
+		parent_doctype=chart.parent_document_type,
 		group_by=group_by_field,
 		order_by="count desc",
 		ignore_ifnull=True,
 	)
 
 	if data:
-		if chart.number_of_groups and chart.number_of_groups < len(data):
-			other_count = 0
-			for i in range(chart.number_of_groups - 1, len(data)):
-				other_count += data[i]["count"]
-			data = data[0 : chart.number_of_groups - 1]
-			data.append({"name": "Other", "count": other_count})
-
-		chart_config = {
+		return {
 			"labels": [item["name"] if item["name"] else "Not Specified" for item in data],
 			"datasets": [{"name": chart.name, "values": [item["count"] for item in data]}],
 		}
-
-		return chart_config
 	else:
 		return None
 
@@ -346,8 +336,50 @@ def get_charts_for_user(doctype, txt, searchfield, start, page_len, filters):
 
 
 class DashboardChart(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.core.doctype.has_role.has_role import HasRole
+		from frappe.desk.doctype.dashboard_chart_field.dashboard_chart_field import DashboardChartField
+		from frappe.types import DF
+
+		aggregate_function_based_on: DF.Literal
+		based_on: DF.Literal
+		chart_name: DF.Data
+		chart_type: DF.Literal["Count", "Sum", "Average", "Group By", "Custom", "Report"]
+		color: DF.Color | None
+		custom_options: DF.Code | None
+		document_type: DF.Link | None
+		dynamic_filters_json: DF.Code | None
+		filters_json: DF.Code
+		from_date: DF.Date | None
+		group_by_based_on: DF.Literal
+		group_by_type: DF.Literal["Count", "Sum", "Average"]
+		heatmap_year: DF.Literal
+		is_public: DF.Check
+		is_standard: DF.Check
+		last_synced_on: DF.Datetime | None
+		module: DF.Link | None
+		number_of_groups: DF.Int
+		parent_document_type: DF.Link | None
+		report_name: DF.Link | None
+		roles: DF.Table[HasRole]
+		source: DF.Link | None
+		time_interval: DF.Literal["Yearly", "Quarterly", "Monthly", "Weekly", "Daily"]
+		timeseries: DF.Check
+		timespan: DF.Literal["Last Year", "Last Quarter", "Last Month", "Last Week", "Select Date Range"]
+		to_date: DF.Date | None
+		type: DF.Literal["Line", "Bar", "Percentage", "Pie", "Donut", "Heatmap"]
+		use_report_chart: DF.Check
+		value_based_on: DF.Literal
+		x_field: DF.Literal
+		y_axis: DF.Table[DashboardChartField]
+	# end: auto-generated types
 	def on_update(self):
-		frappe.cache().delete_key("chart-data:{}".format(self.name))
+		frappe.cache.delete_key(f"chart-data:{self.name}")
 		if frappe.conf.developer_mode and self.is_standard:
 			export_to_files(record_list=[["Dashboard Chart", self.name]], record_module=self.module)
 
@@ -390,3 +422,25 @@ class DashboardChart(Document):
 				json.loads(self.custom_options)
 			except ValueError as error:
 				frappe.throw(_("Invalid json added in the custom options: {0}").format(error))
+
+
+@frappe.whitelist()
+def get_parent_doctypes(child_type: str) -> list[str]:
+	"""Get all parent doctypes that have the child doctype."""
+	assert isinstance(child_type, str)
+
+	standard = frappe.get_all(
+		"DocField",
+		fields="parent",
+		filters={"fieldtype": "Table", "options": child_type},
+		pluck="parent",
+	)
+
+	custom = frappe.get_all(
+		"Custom Field",
+		fields="dt",
+		filters={"fieldtype": "Table", "options": child_type},
+		pluck="dt",
+	)
+
+	return standard + custom

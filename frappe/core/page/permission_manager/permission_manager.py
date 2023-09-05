@@ -1,6 +1,7 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 
+
 import frappe
 import frappe.defaults
 from frappe import _
@@ -8,8 +9,10 @@ from frappe.core.doctype.doctype.doctype import (
 	clear_permissions_cache,
 	validate_permissions_for_doctype,
 )
+from frappe.exceptions import DoesNotExistError
 from frappe.modules.import_file import get_file_path, read_doc_from_file
 from frappe.permissions import (
+	AUTOMATIC_ROLES,
 	add_permission,
 	get_all_perms,
 	get_linked_doctypes,
@@ -17,7 +20,6 @@ from frappe.permissions import (
 	setup_custom_perms,
 	update_permission_property,
 )
-from frappe.translate import send_translations
 from frappe.utils.user import get_users_with_role as _get_user_with_role
 
 not_allowed_in_permission_manager = ["DocType", "Patch Log", "Module Def", "Transaction Log"]
@@ -26,7 +28,6 @@ not_allowed_in_permission_manager = ["DocType", "Patch Log", "Module Def", "Tran
 @frappe.whitelist()
 def get_roles_and_doctypes():
 	frappe.only_for("System Manager")
-	send_translations(frappe.get_lang_dict("doctype", "DocPerm"))
 
 	active_domains = frappe.get_active_domains()
 
@@ -43,10 +44,8 @@ def get_roles_and_doctypes():
 	restricted_roles = ["Administrator"]
 	if frappe.session.user != "Administrator":
 		custom_user_type_roles = frappe.get_all("User Type", filters={"is_standard": 0}, fields=["role"])
-		for row in custom_user_type_roles:
-			restricted_roles.append(row.role)
-
-		restricted_roles.append("All")
+		restricted_roles.extend(row.role for row in custom_user_type_roles)
+		restricted_roles.extend(AUTOMATIC_ROLES)
 
 	roles = frappe.get_all(
 		"Role",
@@ -62,23 +61,25 @@ def get_roles_and_doctypes():
 	roles_list = [{"label": _(d.get("name")), "value": d.get("name")} for d in roles]
 
 	return {
-		"doctypes": sorted(doctypes_list, key=lambda d: d["label"]),
-		"roles": sorted(roles_list, key=lambda d: d["label"]),
+		"doctypes": sorted(doctypes_list, key=lambda d: d["label"].casefold()),
+		"roles": sorted(roles_list, key=lambda d: d["label"].casefold()),
 	}
 
 
 @frappe.whitelist()
-def get_permissions(doctype=None, role=None):
+def get_permissions(doctype: str | None = None, role: str | None = None):
 	frappe.only_for("System Manager")
+
 	if role:
 		out = get_all_perms(role)
 		if doctype:
 			out = [p for p in out if p.parent == doctype]
+
 	else:
-		filters = dict(parent=doctype)
+		filters = {"parent": doctype}
 		if frappe.session.user != "Administrator":
-			custom_roles = frappe.get_all("Role", filters={"is_custom": 1})
-			filters["role"] = ["not in", [row.name for row in custom_roles]]
+			custom_roles = frappe.get_all("Role", filters={"is_custom": 1}, pluck="name")
+			filters["role"] = ["not in", custom_roles]
 
 		out = frappe.get_all("Custom DocPerm", fields="*", filters=filters, order_by="permlevel")
 		if not out:
@@ -86,11 +87,15 @@ def get_permissions(doctype=None, role=None):
 
 	linked_doctypes = {}
 	for d in out:
-		if not d.parent in linked_doctypes:
-			linked_doctypes[d.parent] = get_linked_doctypes(d.parent)
+		if d.parent not in linked_doctypes:
+			try:
+				linked_doctypes[d.parent] = get_linked_doctypes(d.parent)
+			except DoesNotExistError:
+				# exclude & continue if linked doctype is not found
+				frappe.clear_last_message()
+				continue
 		d.linked_doctypes = linked_doctypes[d.parent]
-		meta = frappe.get_meta(d.parent)
-		if meta:
+		if meta := frappe.get_meta(d.parent):
 			d.is_submittable = meta.is_submittable
 			d.in_create = meta.in_create
 
@@ -117,8 +122,15 @@ def update(doctype, role, permlevel, ptype, value=None):
 	Returns:
 	        str: Refresh flag is permission is updated successfully
 	"""
+
+	def clear_cache():
+		frappe.clear_cache(doctype=doctype)
+
 	frappe.only_for("System Manager")
 	out = update_permission_property(doctype, role, permlevel, ptype, value)
+
+	frappe.db.after_commit.add(clear_cache)
+
 	return "refresh" if out else None
 
 

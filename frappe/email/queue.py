@@ -3,9 +3,8 @@
 
 import frappe
 from frappe import _, msgprint
-from frappe.query_builder import DocType, Interval
-from frappe.query_builder.functions import Now
-from frappe.utils import cint, get_url, now_datetime
+from frappe.utils import cint, cstr, get_url, now_datetime
+from frappe.utils.data import getdate
 from frappe.utils.verified_command import get_signed_params, verify_request
 
 
@@ -16,26 +15,17 @@ def get_emails_sent_this_month(email_account=None):
 
 	if email_account=None, email account filter is not applied while counting
 	"""
-	q = """
-		SELECT
-			COUNT(*)
-		FROM
-			`tabEmail Queue`
-		WHERE
-			`status`='Sent'
-			AND
-			EXTRACT(YEAR_MONTH FROM `creation`) = EXTRACT(YEAR_MONTH FROM NOW())
-	"""
+	today = getdate()
+	month_start = today.replace(day=1)
 
-	q_args = {}
-	if email_account is not None:
-		if email_account:
-			q += " AND email_account = %(email_account)s"
-			q_args["email_account"] = email_account
-		else:
-			q += " AND (email_account is null OR email_account='')"
+	filters = {
+		"status": "Sent",
+		"creation": [">=", str(month_start)],
+	}
+	if email_account:
+		filters["email_account"] = email_account
 
-	return frappe.db.sql(q, q_args)[0][0]
+	return frappe.db.count("Email Queue", filters=filters)
 
 
 def get_emails_sent_today(email_account=None):
@@ -67,54 +57,36 @@ def get_emails_sent_today(email_account=None):
 	return frappe.db.sql(q, q_args)[0][0]
 
 
-def get_unsubscribe_message(unsubscribe_message, expose_recipients):
-	if unsubscribe_message:
-		unsubscribe_html = """<a href="<!--unsubscribe_url-->"
-			target="_blank">{0}</a>""".format(
-			unsubscribe_message
-		)
-	else:
-		unsubscribe_link = """<a href="<!--unsubscribe_url-->"
-			target="_blank">{0}</a>""".format(
-			_("Unsubscribe")
-		)
-		unsubscribe_html = _("{0} to stop receiving emails of this type").format(unsubscribe_link)
-
-	html = """<div class="email-unsubscribe">
+def get_unsubscribe_message(
+	unsubscribe_message: str, expose_recipients: str
+) -> "frappe._dict[str, str]":
+	unsubscribe_message = unsubscribe_message or _("Unsubscribe")
+	unsubscribe_link = f'<a href="<!--unsubscribe_url-->" target="_blank">{unsubscribe_message}</a>'
+	unsubscribe_html = _("{0} to stop receiving emails of this type").format(unsubscribe_link)
+	html = f"""<div class="email-unsubscribe">
 			<!--cc_message-->
 			<div>
-				{0}
+				{unsubscribe_html}
 			</div>
-		</div>""".format(
-		unsubscribe_html
-	)
+		</div>"""
 
+	text = f"\n\n{unsubscribe_message}: <!--unsubscribe_url-->\n"
 	if expose_recipients == "footer":
-		text = "\n<!--cc_message-->"
-	else:
-		text = ""
-	text += "\n\n{unsubscribe_message}: <!--unsubscribe_url-->\n".format(
-		unsubscribe_message=unsubscribe_message
-	)
+		text = f"\n<!--cc_message-->{text}"
 
-	return frappe._dict({"html": html, "text": text})
+	return frappe._dict(html=html, text=text)
 
 
 def get_unsubcribed_url(
 	reference_doctype, reference_name, email, unsubscribe_method, unsubscribe_params
 ):
 	params = {
-		"email": email.encode("utf-8"),
-		"doctype": reference_doctype.encode("utf-8"),
-		"name": reference_name.encode("utf-8"),
+		"email": cstr(email),
+		"doctype": cstr(reference_doctype),
+		"name": cstr(reference_name),
 	}
 	if unsubscribe_params:
 		params.update(unsubscribe_params)
-
-	query_string = get_signed_params(params)
-
-	# for test
-	frappe.local.flags.signed_query_string = query_string
 
 	return get_url(unsubscribe_method + "?" + get_signed_params(params))
 
@@ -122,7 +94,7 @@ def get_unsubcribed_url(
 @frappe.whitelist(allow_guest=True)
 def unsubscribe(doctype, name, email):
 	# unsubsribe from comments and communications
-	if not verify_request():
+	if not frappe.flags.in_test and not verify_request():
 		return
 
 	try:
@@ -161,14 +133,19 @@ def flush(from_test=False):
 		msgprint(_("Emails are muted"))
 		from_test = True
 
-	if cint(frappe.defaults.get_defaults().get("hold_queue")) == 1:
+	if cint(frappe.db.get_default("suspend_email_queue")) == 1:
 		return
 
 	for row in get_queue():
 		try:
-			func = send_mail if from_test else send_mail.enqueue
-			is_background_task = not from_test
-			func(email_queue_name=row.name, is_background_task=is_background_task)
+			frappe.enqueue(
+				method=send_mail,
+				email_queue_name=row.name,
+				now=from_test,
+				job_id=f"email_queue_sendmail_{row.name}",
+				queue="short",
+				deduplicate=True,
+			)
 		except Exception:
 			frappe.get_doc("Email Queue", row.name).log_error()
 
@@ -187,39 +164,4 @@ def get_queue():
 		limit 500""",
 		{"now": now_datetime()},
 		as_dict=True,
-	)
-
-
-def clear_outbox(days: int = None) -> None:
-	"""Remove low priority older than 31 days in Outbox or configured in Log Settings.
-	Note: Used separate query to avoid deadlock
-	"""
-	days = days or 31
-	email_queue = DocType("Email Queue")
-
-	email_queues = (
-		frappe.qb.from_(email_queue)
-		.select(email_queue.name)
-		.where(email_queue.modified < (Now() - Interval(days=days)))
-		.run(pluck=True)
-	)
-
-	if email_queues:
-		frappe.db.delete("Email Queue", {"name": ("in", email_queues)})
-		frappe.db.delete("Email Queue Recipient", {"parent": ("in", email_queues)})
-
-
-def set_expiry_for_email_queue():
-	"""Mark emails as expire that has not sent for 7 days.
-	Called daily via scheduler.
-	"""
-
-	frappe.db.sql(
-		"""
-		UPDATE `tabEmail Queue`
-		SET `status`='Expired'
-		WHERE `modified` < (NOW() - INTERVAL '7' DAY)
-		AND `status`='Not Sent'
-		AND (`send_after` IS NULL OR `send_after` < %(now)s)""",
-		{"now": now_datetime()},
 	)

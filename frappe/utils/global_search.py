@@ -13,6 +13,8 @@ from frappe.utils import cint, strip_html_tags
 from frappe.utils.data import cstr
 from frappe.utils.html_utils import unescape_html
 
+HTML_TAGS_PATTERN = re.compile(r"(?s)<[\s]*(script|style).*?</\1>")
+
 
 def setup_global_search_table():
 	"""
@@ -59,7 +61,7 @@ def get_doctypes_with_global_search(with_child_tables=True):
 
 		return doctypes
 
-	return frappe.cache().get_value("doctypes_with_global_search", _get)
+	return frappe.cache.get_value("doctypes_with_global_search", _get)
 
 
 def rebuild_for_doctype(doctype):
@@ -68,9 +70,6 @@ def rebuild_for_doctype(doctype):
 	searchable fields
 	:param doctype: Doctype
 	"""
-	if frappe.local.conf.get("disable_global_search"):
-		return
-
 	if frappe.local.conf.get("disable_global_search"):
 		return
 
@@ -209,10 +208,10 @@ def get_children_data(doctype, meta):
 
 
 def insert_values_for_multiple_docs(all_contents):
-	values = []
-	for content in all_contents:
-		values.append("({doctype}, {name}, {content}, {published}, {title}, {route})".format(**content))
-
+	values = [
+		"({doctype}, {name}, {content}, {published}, {title}, {route})".format(**content)
+		for content in all_contents
+	]
 	batch_size = 50000
 	for i in range(0, len(values), batch_size):
 		batch_values = values[i : i + batch_size]
@@ -221,12 +220,12 @@ def insert_values_for_multiple_docs(all_contents):
 			{
 				"mariadb": """INSERT IGNORE INTO `__global_search`
 				(doctype, name, content, published, title, route)
-				VALUES {0} """.format(
+				VALUES {} """.format(
 					", ".join(batch_values)
 				),
 				"postgres": """INSERT INTO `__global_search`
 				(doctype, name, content, published, title, route)
-				VALUES {0}
+				VALUES {}
 				ON CONFLICT("name", "doctype") DO NOTHING""".format(
 					", ".join(batch_values)
 				),
@@ -250,19 +249,21 @@ def update_global_search(doc):
 	):
 		return
 
-	content = []
-	for field in doc.meta.get_global_search_fields():
-		if doc.get(field.fieldname) and field.fieldtype not in frappe.model.table_fields:
-			content.append(get_formatted_value(doc.get(field.fieldname), field))
+	content = [
+		get_formatted_value(doc.get(field.fieldname), field)
+		for field in doc.meta.get_global_search_fields()
+		if doc.get(field.fieldname) and field.fieldtype not in frappe.model.table_fields
+	]
 
 	# Get children
 	for child in doc.meta.get_table_fields():
 		for d in doc.get(child.fieldname):
 			if d.parent == doc.name:
-				for field in d.meta.get_global_search_fields():
-					if d.get(field.fieldname):
-						content.append(get_formatted_value(d.get(field.fieldname), field))
-
+				content.extend(
+					get_formatted_value(d.get(field.fieldname), field)
+					for field in d.meta.get_global_search_fields()
+					if d.get(field.fieldname)
+				)
 	if content:
 		published = 0
 		if hasattr(doc, "is_website_published") and doc.meta.allow_guest_to_view:
@@ -308,7 +309,7 @@ def get_routes_to_index():
 					filepath = os.path.join(dirpath, f)
 
 					route = os.path.relpath(filepath, base)
-					route = route.split(".")[0]
+					route = route.split(".", 1)[0]
 
 					if route.endswith("index"):
 						route = route.rsplit("index", 1)[0]
@@ -360,7 +361,7 @@ def get_formatted_value(value, field):
 
 	if getattr(field, "fieldtype", None) in ["Text", "Text Editor"]:
 		value = unescape_html(frappe.safe_decode(value))
-		value = re.subn(r"(?s)<[\s]*(script|style).*?</\1>", "", str(value))[0]
+		value = HTML_TAGS_PATTERN.subn("", str(value))[0]
 		value = " ".join(value.split())
 	return field.label + " : " + strip_html_tags(str(value))
 
@@ -372,17 +373,17 @@ def sync_global_search():
 	:param flags:
 	:return:
 	"""
-	while frappe.cache().llen("global_search_queue") > 0:
+	while frappe.cache.llen("global_search_queue") > 0:
 		# rpop to follow FIFO
 		# Last one should override all previous contents of same document
-		value = json.loads(frappe.cache().rpop("global_search_queue").decode("utf-8"))
+		value = json.loads(frappe.cache.rpop("global_search_queue").decode("utf-8"))
 		sync_value(value)
 
 
 def sync_value_in_queue(value):
 	try:
 		# append to search queue if connected
-		frappe.cache().lpush("global_search_queue", json.dumps(value))
+		frappe.cache.lpush("global_search_queue", json.dumps(value))
 	except redis.exceptions.ConnectionError:
 		# not connected, sync directly
 		sync_value(value)
@@ -447,13 +448,13 @@ def search(text, start=0, limit=20, doctype=""):
 
 	allowed_doctypes = get_doctypes_for_global_search()
 
-	for text in set(text.split("&")):
-		text = text.strip()
-		if not text:
+	for word in set(text.split("&")):
+		word = word.strip()
+		if not word:
 			continue
 
 		global_search = frappe.qb.Table("__global_search")
-		rank = Match(global_search.content).Against(text).as_("rank")
+		rank = Match(global_search.content).Against(word).as_("rank")
 		query = (
 			frappe.qb.from_(global_search)
 			.select(global_search.doctype, global_search.name, global_search.content, rank)
@@ -490,7 +491,7 @@ def search(text, start=0, limit=20, doctype=""):
 
 
 @frappe.whitelist(allow_guest=True)
-def web_search(text, scope=None, start=0, limit=20):
+def web_search(text: str, scope: str | None = None, start: int = 0, limit: int = 20):
 	"""
 	Search for given text in __global_search where published = 1
 	:param text: phrase to be searched

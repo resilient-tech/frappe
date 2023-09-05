@@ -4,14 +4,14 @@
 import io
 import json
 import os
+import re
 import timeit
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 import frappe
 from frappe import _
 from frappe.core.doctype.version.version import get_diff
 from frappe.model import no_value_fields
-from frappe.model import table_fields as table_fieldtypes
 from frappe.utils import cint, cstr, duration_to_seconds, flt, update_progress_bar
 from frappe.utils.csvutils import get_csv_content_from_google_sheets, read_csv_content
 from frappe.utils.xlsxutils import (
@@ -23,6 +23,7 @@ INVALID_VALUES = ("", None)
 MAX_ROWS_IN_PREVIEW = 10
 INSERT = "Insert New Records"
 UPDATE = "Update Existing Records"
+DURATION_PATTERN = re.compile(r"^(?:(\d+d)?((^|\s)\d+h)?((^|\s)\d+m)?((^|\s)\d+s)?)$")
 
 
 class Importer:
@@ -49,7 +50,7 @@ class Importer:
 	def get_data_for_import_preview(self):
 		out = self.import_file.get_data_for_import_preview()
 
-		out.import_log = frappe.db.get_all(
+		out.import_log = frappe.get_all(
 			"Data Import Log",
 			fields=["row_indexes", "success"],
 			filters={"data_import": self.data_import.name},
@@ -61,7 +62,7 @@ class Importer:
 
 	def before_import(self):
 		# set user lang for translations
-		frappe.cache().hdel("lang", frappe.session.user)
+		frappe.cache.hdel("lang", frappe.session.user)
 		frappe.set_user_lang(frappe.session.user)
 
 		# set flags
@@ -89,7 +90,7 @@ class Importer:
 
 		# setup import log
 		import_log = (
-			frappe.db.get_all(
+			frappe.get_all(
 				"Data Import Log",
 				fields=["row_indexes", "success", "log_index"],
 				filters={"data_import": self.data_import.name},
@@ -138,6 +139,7 @@ class Importer:
 								"skipping": True,
 								"data_import": self.data_import.name,
 							},
+							user=frappe.session.user,
 						)
 					continue
 
@@ -149,7 +151,7 @@ class Importer:
 
 					if self.console:
 						update_progress_bar(
-							"Importing {0} records".format(total_payload_count),
+							f"Importing {total_payload_count} records",
 							current_index,
 							total_payload_count,
 						)
@@ -165,6 +167,7 @@ class Importer:
 								"row_indexes": row_indexes,
 								"eta": eta,
 							},
+							user=frappe.session.user,
 						)
 
 					create_import_log(
@@ -203,7 +206,7 @@ class Importer:
 
 		# Logs are db inserted directly so will have to be fetched again
 		import_log = (
-			frappe.db.get_all(
+			frappe.get_all(
 				"Data Import Log",
 				fields=["row_indexes", "success", "log_index"],
 				filters={"data_import": self.data_import.name},
@@ -296,7 +299,7 @@ class Importer:
 			return
 
 		import_log = (
-			frappe.db.get_all(
+			frappe.get_all(
 				"Data Import Log",
 				fields=["row_indexes", "success"],
 				filters={"data_import": self.data_import.name},
@@ -326,7 +329,7 @@ class Importer:
 		if not self.data_import:
 			return
 
-		import_log = frappe.db.get_all(
+		import_log = frappe.get_all(
 			"Data Import Log",
 			fields=["row_indexes", "success", "messages", "exception", "docname"],
 			filters={"data_import": self.data_import.name},
@@ -341,7 +344,7 @@ class Importer:
 			row_number = json.loads(log.get("row_indexes"))[0]
 			status = "Success" if log.get("success") else "Failure"
 			message = (
-				"Successfully Imported {0}".format(log.get("docname"))
+				"Successfully Imported {}".format(log.get("docname"))
 				if log.get("success")
 				else log.get("messages")
 			)
@@ -356,19 +359,17 @@ class Importer:
 
 		if successful_records:
 			print()
-			print(
-				"Successfully imported {0} records out of {1}".format(len(successful_records), len(import_log))
-			)
+			print(f"Successfully imported {len(successful_records)} records out of {len(import_log)}")
 
 		if failed_records:
-			print("Failed to import {0} records".format(len(failed_records)))
-			file_name = "{0}_import_on_{1}.txt".format(self.doctype, frappe.utils.now())
-			print("Check {0} for errors".format(os.path.join("sites", file_name)))
+			print(f"Failed to import {len(failed_records)} records")
+			file_name = f"{self.doctype}_import_on_{frappe.utils.now()}.txt"
+			print("Check {} for errors".format(os.path.join("sites", file_name)))
 			text = ""
 			for w in failed_records:
-				text += "Row Indexes: {0}\n".format(str(w.get("row_indexes", [])))
-				text += "Messages:\n{0}\n".format("\n".join(w.get("messages", [])))
-				text += "Traceback:\n{0}\n\n".format(w.get("exception"))
+				text += "Row Indexes: {}\n".format(str(w.get("row_indexes", [])))
+				text += "Messages:\n{}\n".format("\n".join(w.get("messages", [])))
+				text += "Traceback:\n{}\n\n".format(w.get("exception"))
 
 			with open(file_name, "w") as f:
 				f.write(text)
@@ -383,7 +384,7 @@ class Importer:
 				other_warnings.append(w)
 
 		for row_number, warnings in warnings_by_row.items():
-			print("Row {0}".format(row_number))
+			print(f"Row {row_number}")
 			for w in warnings:
 				print(w.get("message"))
 
@@ -450,7 +451,7 @@ class ImportFile:
 				continue
 
 			if not header:
-				header = Header(i, row, self.doctype, self.raw_data, self.column_to_field_map)
+				header = Header(i, row, self.doctype, self.raw_data[1:], self.column_to_field_map)
 			else:
 				row_obj = Row(i, row, self.doctype, header, self.import_type)
 				data.append(row_obj)
@@ -573,12 +574,19 @@ class ImportFile:
 
 	######
 
-	def read_file(self, file_path):
-		extn = file_path.split(".")[1]
+	def read_file(self, file_path: str):
+		extn = os.path.splitext(file_path)[1][1:]
 
 		file_content = None
-		with io.open(file_path, mode="rb") as f:
-			file_content = f.read()
+
+		if self.console:
+			file_content = frappe.read_file(file_path, True)
+			return file_content, extn
+
+		file_name = frappe.db.get_value("File", {"file_url": file_path})
+		if file_name:
+			file = frappe.get_doc("File", file_name)
+			file_content = file.get_content()
 
 		return file_content, extn
 
@@ -598,8 +606,6 @@ class ImportFile:
 
 
 class Row:
-	link_values_exist_map = {}
-
 	def __init__(self, index, row, doctype, header, import_type):
 		self.index = index
 		self.row_number = index + 1
@@ -632,8 +638,7 @@ class Row:
 			return None
 
 		columns = self.header.get_columns(col_indexes)
-		doc = self._parse_doc(doctype, columns, values, parent_doc, table_df)
-		return doc
+		return self._parse_doc(doctype, columns, values, parent_doc, table_df)
 
 	def _parse_doc(self, doctype, columns, values, parent_doc=None, table_df=None):
 		doc = frappe._dict()
@@ -686,7 +691,7 @@ class Row:
 		df = col.df
 		if df.fieldtype == "Select":
 			select_options = get_select_options(df)
-			if select_options and value not in select_options:
+			if select_options and cstr(value) not in select_options:
 				options_string = ", ".join(frappe.bold(d) for d in select_options)
 				msg = _("Value must be one of {0}").format(options_string)
 				self.warnings.append(
@@ -726,10 +731,7 @@ class Row:
 				)
 				return
 		elif df.fieldtype == "Duration":
-			import re
-
-			is_valid_duration = re.match(r"^(?:(\d+d)?((^|\s)\d+h)?((^|\s)\d+m)?((^|\s)\d+s)?)$", value)
-			if not is_valid_duration:
+			if not DURATION_PATTERN.match(value):
 				self.warnings.append(
 					{
 						"row": self.row_number,
@@ -744,10 +746,7 @@ class Row:
 		return value
 
 	def link_exists(self, value, df):
-		key = df.options + "::" + cstr(value)
-		if Row.link_values_exist_map.get(key) is None:
-			Row.link_values_exist_map[key] = frappe.db.exists(df.options, value)
-		return Row.link_values_exist_map.get(key)
+		return bool(frappe.db.exists(df.options, value, cache=True))
 
 	def parse_value(self, value, col):
 		df = col.df
@@ -843,9 +842,6 @@ class Header(Row):
 
 
 class Column:
-	seen = []
-	fields_column_map = {}
-
 	def __init__(self, index, header, doctype, column_values, map_to_field=None, seen=None):
 		if seen is None:
 			seen = []
@@ -941,11 +937,13 @@ class Column:
 		"""
 
 		def guess_date_format(d):
-			if isinstance(d, (datetime, date)):
+			if isinstance(d, (datetime, date, time)):
 				if self.df.fieldtype == "Date":
 					return "%Y-%m-%d"
 				if self.df.fieldtype == "Datetime":
 					return "%Y-%m-%d %H:%M:%S"
+				if self.df.fieldtype == "Time":
+					return "%H:%M:%S"
 			if isinstance(d, str):
 				return frappe.utils.guess_date_format(d)
 
@@ -983,51 +981,60 @@ class Column:
 		if self.skip_import:
 			return
 
+		if not any(self.column_values):
+			return
+
 		if self.df.fieldtype == "Link":
 			# find all values that dont exist
-			values = list({cstr(v) for v in self.column_values[1:] if v})
-			exists = [d.name for d in frappe.db.get_all(self.df.options, filters={"name": ("in", values)})]
+			values = list({cstr(v) for v in self.column_values if v})
+			exists = [
+				cstr(d.name) for d in frappe.get_all(self.df.options, filters={"name": ("in", values)})
+			]
 			not_exists = list(set(values) - set(exists))
 			if not_exists:
 				missing_values = ", ".join(not_exists)
+				message = _("The following values do not exist for {0}: {1}")
 				self.warnings.append(
 					{
 						"col": self.column_number,
-						"message": (
-							"The following values do not exist for {}: {}".format(self.df.options, missing_values)
-						),
+						"message": message.format(self.df.options, missing_values),
 						"type": "warning",
 					}
 				)
 		elif self.df.fieldtype in ("Date", "Time", "Datetime"):
-			# guess date format
+			# guess date/time format
 			self.date_format = self.guess_date_format_for_column()
 			if not self.date_format:
-				self.date_format = "%Y-%m-%d"
+				if self.df.fieldtype == "Time":
+					self.date_format = "%H:%M:%S"
+					date_format = "HH:mm:ss"
+				else:
+					self.date_format = "%Y-%m-%d"
+					date_format = "yyyy-mm-dd"
+
+				message = _(
+					"{0} format could not be determined from the values in this column. Defaulting to {1}."
+				)
 				self.warnings.append(
 					{
 						"col": self.column_number,
-						"message": _(
-							"Date format could not be determined from the values in this column. Defaulting to yyyy-mm-dd."
-						),
+						"message": message.format(self.df.fieldtype, date_format),
 						"type": "info",
 					}
 				)
 		elif self.df.fieldtype == "Select":
 			options = get_select_options(self.df)
 			if options:
-				values = {cstr(v) for v in self.column_values[1:] if v}
+				values = {cstr(v) for v in self.column_values if v}
 				invalid = values - set(options)
 				if invalid:
 					valid_values = ", ".join(frappe.bold(o) for o in options)
 					invalid_values = ", ".join(frappe.bold(i) for i in invalid)
+					message = _("The following values are invalid: {0}. Values must be one of {1}")
 					self.warnings.append(
 						{
 							"col": self.column_number,
-							"message": (
-								"The following values are invalid: {0}. Values must be"
-								" one of {1}".format(invalid_values, valid_values)
-							),
+							"message": message.format(invalid_values, valid_values),
 						}
 					)
 
@@ -1112,9 +1119,9 @@ def build_fields_dict_for_column_matching(parent_doctype):
 			)
 		else:
 			name_headers = (
-				"{0}.name".format(table_df.fieldname),  # fieldname
-				"ID ({0})".format(table_df.label),  # label
-				"{0} ({1})".format(_("ID"), translated_table_label),  # translated label
+				f"{table_df.fieldname}.name",  # fieldname
+				f"ID ({table_df.label})",  # label
+				"{} ({})".format(_("ID"), translated_table_label),  # translated label
 			)
 
 			name_df.is_child_table_field = True
@@ -1166,11 +1173,11 @@ def build_fields_dict_for_column_matching(parent_doctype):
 
 				for header in (
 					# fieldname
-					"{0}.{1}".format(table_df.fieldname, df.fieldname),
+					f"{table_df.fieldname}.{df.fieldname}",
 					# label
-					"{0} ({1})".format(label, table_df.label),
+					f"{label} ({table_df.label})",
 					# translated label
-					"{0} ({1})".format(translated_label, translated_table_label),
+					f"{translated_label} ({translated_table_label})",
 				):
 					out[header] = new_df
 
@@ -1179,8 +1186,8 @@ def build_fields_dict_for_column_matching(parent_doctype):
 	autoname_field = get_autoname_field(parent_doctype)
 	if autoname_field:
 		for header in (
-			"ID ({})".format(autoname_field.label),  # label
-			"{0} ({1})".format(_("ID"), _(autoname_field.label)),  # translated label
+			f"ID ({autoname_field.label})",  # label
+			"{} ({})".format(_("ID"), _(autoname_field.label)),  # translated label
 			# ID field should also map to the autoname field
 			"ID",
 			_("ID"),
@@ -1195,7 +1202,7 @@ def get_df_for_column_header(doctype, header):
 	def build_fields_dict_for_doctype():
 		return build_fields_dict_for_column_matching(doctype)
 
-	df_by_labels_and_fieldname = frappe.cache().hget(
+	df_by_labels_and_fieldname = frappe.cache.hget(
 		"data_import_column_header_map", doctype, generator=build_fields_dict_for_doctype
 	)
 	return df_by_labels_and_fieldname.get(header)

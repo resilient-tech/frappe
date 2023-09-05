@@ -9,6 +9,10 @@ from frappe.core.doctype.user_permission.user_permission import clear_user_permi
 from frappe.core.page.permission_manager.permission_manager import reset, update
 from frappe.desk.form.load import getdoc
 from frappe.permissions import (
+	ALL_USER_ROLE,
+	AUTOMATIC_ROLES,
+	GUEST_ROLE,
+	SYSTEM_USER_ROLE,
 	add_permission,
 	add_user_permission,
 	clear_user_permissions_for_doctype,
@@ -87,6 +91,11 @@ class TestPermissions(FrappeTestCase):
 		# validate does not have read and write perm
 		self.assertFalse(post.has_permission("read"))
 		self.assertRaises(frappe.PermissionError, post.save)
+
+		permitted_record = frappe.get_list("Blog Post", fields="*", limit=1)[0]
+		full_record = frappe.get_all("Blog Post", fields="*", limit=1)[0]
+		self.assertNotEqual(permitted_record, full_record)
+		self.assertSequenceSubset(post.meta.get_search_fields(), permitted_record)
 
 	def test_user_permissions_in_doc(self):
 		add_user_permission("Blog Category", "-test-blog-category-1", "test2@example.com")
@@ -461,7 +470,7 @@ class TestPermissions(FrappeTestCase):
 			self.assertIn(
 				post.blogger,
 				["_Test Blogger", "_Test Blogger 1"],
-				"A post from {} is not expected.".format(post.blogger),
+				f"A post from {post.blogger} is not expected.",
 			)
 
 	def test_if_owner_permission_overrides_properly(self):
@@ -649,26 +658,90 @@ class TestPermissions(FrappeTestCase):
 		# reset the user
 		frappe.set_user(current_user)
 
-	def test_child_table_permissions(self):
-		frappe.set_user("test@example.com")
-		self.assertIsInstance(frappe.get_list("Has Role", parent_doctype="User", limit=1), list)
-		self.assertRaisesRegex(
-			frappe.exceptions.ValidationError,
-			".* is not a valid parent DocType for .*",
-			frappe.get_list,
-			doctype="Has Role",
-			parent_doctype="ToDo",
+	def test_child_permissions(self):
+		frappe.set_user("test3@example.com")
+		self.assertIsInstance(frappe.get_list("DefaultValue", parent_doctype="User", limit=1), list)
+
+		# frappe.get_list
+		self.assertRaises(frappe.PermissionError, frappe.get_list, "DefaultValue")
+		self.assertRaises(frappe.PermissionError, frappe.get_list, "DefaultValue", parent_doctype="ToDo")
+		self.assertRaises(
+			frappe.PermissionError, frappe.get_list, "DefaultValue", parent_doctype="DefaultValue"
 		)
-		self.assertRaisesRegex(
-			frappe.exceptions.ValidationError,
-			"Please specify a valid parent DocType for .*",
-			frappe.get_list,
-			"Has Role",
+
+		# frappe.get_doc
+		user = frappe.get_doc("User", frappe.session.user)
+		doc = user.append("defaults")
+		doc.check_permission()
+
+		# false due to missing parentfield
+		doc = user.append("roles")
+		doc.parentfield = None
+		self.assertRaises(frappe.PermissionError, doc.check_permission)
+
+		# false due to invalid parentfield
+		doc = user.append("roles")
+		doc.parentfield = "first_name"
+		self.assertRaises(frappe.PermissionError, doc.check_permission)
+
+		# false by permlevel
+		doc = user.append("roles")
+		self.assertRaises(frappe.PermissionError, doc.check_permission)
+
+		# false by user permission
+		user = frappe.get_doc("User", "Administrator")
+		doc = user.append("defaults")
+		self.assertRaises(frappe.PermissionError, doc.check_permission)
+
+	def test_select_user(self):
+		"""If test3@example.com is restricted by a User Permission to see only
+		users linked to a certain doctype (in this case: Gender "Female"), he
+		should not be able to query other users (Gender "Male").
+		"""
+		# ensure required genders exist
+		for gender in ("Male", "Female"):
+			if frappe.db.exists("Gender", gender):
+				continue
+
+			frappe.get_doc({"doctype": "Gender", "gender": gender}).insert()
+
+		# asssign gender to test users
+		frappe.db.set_value("User", "test1@example.com", "gender", "Male")
+		frappe.db.set_value("User", "test2@example.com", "gender", "Female")
+		frappe.db.set_value("User", "test3@example.com", "gender", "Female")
+
+		# restrict test3@example.com to see only female users
+		add_user_permission("Gender", "Female", "test3@example.com")
+
+		# become user test3@example.com and see what users he can query
+		frappe.set_user("test3@example.com")
+		users = frappe.get_list("User", pluck="name")
+
+		self.assertNotIn("test1@example.com", users)
+		self.assertIn("test2@example.com", users)
+		self.assertIn("test3@example.com", users)
+
+	def test_automatic_permissions(self):
+		def assertHasRole(*roles: str | tuple[str, ...]):
+			for role in roles:
+				self.assertIn(role, frappe.get_roles())
+
+		frappe.set_user("Administrator")
+		assertHasRole(*AUTOMATIC_ROLES)
+
+		frappe.set_user("Guest")
+		assertHasRole(GUEST_ROLE)
+
+		website_user = frappe.db.get_value(
+			"User",
+			{"user_type": "Website User", "enabled": 1, "name": ("not in", AUTOMATIC_ROLES)},
 		)
-		self.assertRaisesRegex(
-			frappe.exceptions.ValidationError,
-			".* is not a valid parent DocType for .*",
-			frappe.get_list,
-			doctype="Has Role",
-			parent_doctype="Has Role",
+		frappe.set_user(website_user)
+		assertHasRole(GUEST_ROLE, ALL_USER_ROLE)
+
+		system_user = frappe.db.get_value(
+			"User",
+			{"user_type": "System User", "enabled": 1, "name": ("not in", AUTOMATIC_ROLES)},
 		)
+		frappe.set_user(system_user)
+		assertHasRole(GUEST_ROLE, ALL_USER_ROLE, SYSTEM_USER_ROLE)

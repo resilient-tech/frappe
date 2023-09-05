@@ -1,12 +1,13 @@
 import "./jquery-bootstrap";
-import Vue from "vue/dist/vue.esm.js";
 import "./lib/moment";
-import io from "socket.io-client/dist/socket.io.slim.js";
-import Sortable from "./lib/Sortable.min.js";
-// TODO: esbuild
-// Don't think jquery.hotkeys is being used anywhere. Will remove this after being sure.
-// import "./lib/jquery/jquery.hotkeys.js";
+import "../js/lib/leaflet/leaflet.js";
+import "../js/lib/leaflet_easy_button/easy-button.js";
+import "../js/lib/leaflet_draw/leaflet.draw.js";
+import "../js/lib/leaflet_control_locate/L.Control.Locate.js";
+import Sortable from "sortablejs";
 
-window.Vue = Vue;
+window.SetVueGlobals = (app) => {
+	app.config.globalProperties.__ = window.__;
+	app.config.globalProperties.frappe = window.frappe;
+};
 window.Sortable = Sortable;
-window.io = io;

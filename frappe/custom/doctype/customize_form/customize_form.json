@@ -10,27 +10,44 @@
   "doc_type",
   "properties",
   "label",
-  "max_attachments",
   "search_fields",
   "column_break_5",
-  "allow_copy",
   "istable",
+  "is_calendar_and_gantt",
   "editable_grid",
   "quick_entry",
   "track_changes",
   "track_views",
   "allow_auto_repeat",
   "allow_import",
-  "fields_section_break",
-  "fields",
+  "queue_in_background",
   "naming_section",
   "naming_rule",
   "autoname",
+  "document_actions_section",
+  "actions",
+  "document_links_section",
+  "links",
+  "document_states_section",
+  "states",
+  "form_tab",
+  "form_builder",
+  "fields_section_break",
+  "fields",
+  "settings_tab",
+  "form_settings_section",
+  "image_field",
+  "max_attachments",
+  "column_break_21",
+  "allow_copy",
+  "make_attachments_public",
   "view_settings_section",
   "title_field",
   "show_title_field_in_link",
-  "image_field",
+  "translated_doctype",
   "default_print_format",
+  "default_view",
+  "force_re_route_to_default_view",
   "column_break_29",
   "show_preview_popup",
   "email_settings_section",
@@ -39,12 +56,6 @@
   "email_append_to",
   "sender_field",
   "subject_field",
-  "document_actions_section",
-  "actions",
-  "document_links_section",
-  "links",
-  "document_states_section",
-  "states",
   "section_break_8",
   "sort_field",
   "column_break_10",
@@ -165,8 +176,8 @@
    "options": "ASC\nDESC"
   },
   {
+   "collapsible": 1,
    "depends_on": "doc_type",
-   "description": "Customize Label, Print Hide, Default etc.",
    "fieldname": "fields_section_break",
    "fieldtype": "Section Break",
    "label": "Fields"
@@ -287,7 +298,7 @@
    "label": "Naming"
   },
   {
-   "description": "Naming Options:\n<ol><li><b>field:[fieldname]</b> - By Field</li>\n<li><b>autoincrement</b> - Uses Databases' Auto Increment feature</li><li><b>naming_series:</b> - By Naming Series (field called naming_series must be present</li><li><b>Prompt</b> - Prompt user for a name</li><li><b>[series]</b> - Series by prefix (separated by a dot); for example PRE.#####</li>\n<li><b>format:EXAMPLE-{MM}morewords{fieldname1}-{fieldname2}-{#####}</b> - Replace all braced words (fieldnames, date words (DD, MM, YY), series) with their value. Outside braces, any characters can be used.</li></ol>",
+   "description": "Naming Options:\n<ol><li><b>field:[fieldname]</b> - By Field</li><li><b>naming_series:</b> - By Naming Series (field called naming_series must be present)</li><li><b>Prompt</b> - Prompt user for a name</li><li><b>[series]</b> - Series by prefix (separated by a dot); for example PRE.#####</li>\n<li><b>format:EXAMPLE-{MM}morewords{fieldname1}-{fieldname2}-{#####}</b> - Replace all braced words (fieldnames, date words (DD, MM, YY), series) with their value. Outside braces, any characters can be used.</li></ol>",
    "fieldname": "autoname",
    "fieldtype": "Data",
    "label": "Auto Name"
@@ -311,6 +322,69 @@
    "fieldname": "show_title_field_in_link",
    "fieldtype": "Check",
    "label": "Show Title in Link Fields"
+  },
+  {
+   "default": "0",
+   "fieldname": "translated_doctype",
+   "fieldtype": "Check",
+   "label": "Translate Link Fields"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "form_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Form Settings"
+  },
+  {
+   "fieldname": "column_break_21",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "make_attachments_public",
+   "fieldtype": "Check",
+   "label": "Make Attachments Public by Default"
+  },
+  {
+   "default": "0",
+   "description": "Enabling this will submit documents in background",
+   "fieldname": "queue_in_background",
+   "fieldtype": "Check",
+   "label": "Queue in Background (BETA)"
+  },
+  {
+   "fieldname": "default_view",
+   "fieldtype": "Select",
+   "label": "Default View"
+  },
+  {
+   "default": "0",
+   "depends_on": "default_view",
+   "fieldname": "force_re_route_to_default_view",
+   "fieldtype": "Check",
+   "label": "Force Re-route to Default View"
+  },
+  {
+   "default": "0",
+   "description": "Enables Calendar and Gantt views.",
+   "fieldname": "is_calendar_and_gantt",
+   "fieldtype": "Check",
+   "label": "Is Calendar and Gantt"
+  },
+  {
+   "fieldname": "settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "Settings"
+  },
+  {
+   "fieldname": "form_builder",
+   "fieldtype": "HTML",
+   "label": "Form Builder"
+  },
+  {
+   "fieldname": "form_tab",
+   "fieldtype": "Tab Break",
+   "label": "Form"
   }
  ],
  "hide_toolbar": 1,
@@ -319,7 +393,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2022-04-21 15:36:16.772277",
+ "modified": "2023-08-29 12:31:55.808848",
  "modified_by": "Administrator",
  "module": "Custom",
  "name": "Customize Form",

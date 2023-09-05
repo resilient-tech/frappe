@@ -3,7 +3,7 @@ from frappe.utils import get_fullname
 
 
 def get_leaderboards():
-	leaderboards = {
+	return {
 		"User": {
 			"fields": ["points"],
 			"method": "frappe.desk.leaderboard.get_energy_point_leaderboard",
@@ -11,12 +11,11 @@ def get_leaderboards():
 			"icon": "users",
 		}
 	}
-	return leaderboards
 
 
 @frappe.whitelist()
 def get_energy_point_leaderboard(date_range, company=None, field=None, limit=None):
-	all_users = frappe.db.get_all(
+	all_users = frappe.get_all(
 		"User",
 		filters={
 			"name": ["not in", ["Administrator", "Guest"]],
@@ -31,7 +30,7 @@ def get_energy_point_leaderboard(date_range, company=None, field=None, limit=Non
 	if date_range:
 		date_range = frappe.parse_json(date_range)
 		filters.append(["creation", "between", [date_range[0], date_range[1]]])
-	energy_point_users = frappe.db.get_all(
+	energy_point_users = frappe.get_all(
 		"Energy Point Log",
 		fields=["user as name", "sum(points) as value"],
 		filters=filters,

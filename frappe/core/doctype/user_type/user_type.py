@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2021, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -11,9 +10,37 @@ from frappe.utils import get_link_to_form
 
 
 class UserType(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.core.doctype.user_document_type.user_document_type import UserDocumentType
+		from frappe.core.doctype.user_select_document_type.user_select_document_type import (
+			UserSelectDocumentType,
+		)
+		from frappe.core.doctype.user_type_module.user_type_module import UserTypeModule
+		from frappe.types import DF
+
+		apply_user_permission_on: DF.Link | None
+		custom_select_doctypes: DF.Table[UserSelectDocumentType]
+		is_standard: DF.Check
+		role: DF.Link | None
+		select_doctypes: DF.Table[UserSelectDocumentType]
+		user_doctypes: DF.Table[UserDocumentType]
+		user_id_field: DF.Literal
+		user_type_modules: DF.Table[UserTypeModule]
+	# end: auto-generated types
 	def validate(self):
 		self.set_modules()
 		self.add_select_perm_doctypes()
+
+	def clear_cache(self):
+		super().clear_cache()
+
+		if not self.is_standard:
+			frappe.cache.delete_value("non_standard_user_types")
 
 	def on_update(self):
 		if self.is_standard:
@@ -25,7 +52,6 @@ class UserType(Document):
 		self.add_role_permissions_for_select_doctypes()
 		self.add_role_permissions_for_file()
 		self.update_users()
-		get_non_standard_user_type_details()
 		self.remove_permission_for_deleted_doctypes()
 
 	def on_trash(self):
@@ -167,9 +193,7 @@ class UserType(Document):
 		doctypes.append("File")
 
 		for doctype in ["select_doctypes", "custom_select_doctypes"]:
-			for dt in self.get(doctype):
-				doctypes.append(dt.document_type)
-
+			doctypes.extend(dt.document_type for dt in self.get(doctype))
 		for perm in frappe.get_all(
 			"Custom DocPerm", filters={"role": self.role, "parent": ["not in", doctypes]}
 		):
@@ -185,19 +209,14 @@ def add_role_permissions(doctype, role):
 	return name
 
 
-def get_non_standard_user_type_details():
+def get_non_standard_user_types():
 	user_types = frappe.get_all(
 		"User Type",
 		fields=["apply_user_permission_on", "name", "user_id_field"],
 		filters={"is_standard": 0},
 	)
 
-	if user_types:
-		user_type_details = {d.name: [d.apply_user_permission_on, d.user_id_field] for d in user_types}
-
-		frappe.cache().set_value("non_standard_user_types", user_type_details)
-
-		return user_type_details
+	return {d.name: [d.apply_user_permission_on, d.user_id_field] for d in user_types}
 
 
 @frappe.whitelist()
@@ -211,7 +230,7 @@ def get_user_linked_doctypes(doctype, txt, searchfield, start, page_len, filters
 		["DocType", "issingle", "=", 0],
 		["DocType", "module", "not in", modules],
 		["DocType", "read_only", "=", 0],
-		["DocType", "name", "like", "%{0}%".format(txt)],
+		["DocType", "name", "like", f"%{txt}%"],
 	]
 
 	doctypes = frappe.get_all(
@@ -225,7 +244,7 @@ def get_user_linked_doctypes(doctype, txt, searchfield, start, page_len, filters
 	)
 
 	custom_dt_filters = [
-		["Custom Field", "dt", "like", "%{0}%".format(txt)],
+		["Custom Field", "dt", "like", f"%{txt}%"],
 		["Custom Field", "options", "=", "User"],
 		["Custom Field", "fieldtype", "=", "Link"],
 	]
@@ -288,13 +307,13 @@ def user_linked_with_permission_on_doctype(doc, user):
 
 def apply_permissions_for_non_standard_user_type(doc, method=None):
 	"""Create user permission for the non standard user type"""
-	if not frappe.db.table_exists("User Type"):
+	if not frappe.db.table_exists("User Type") or frappe.flags.in_migrate:
 		return
 
-	user_types = frappe.cache().get_value("non_standard_user_types")
-
-	if not user_types:
-		user_types = get_non_standard_user_type_details()
+	user_types = frappe.cache.get_value(
+		"non_standard_user_types",
+		get_non_standard_user_types,
+	)
 
 	if not user_types:
 		return

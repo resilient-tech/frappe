@@ -8,6 +8,7 @@ from jinja2.exceptions import TemplateSyntaxError
 import frappe
 from frappe import _
 from frappe.utils import get_datetime, now, quoted, strip_html
+from frappe.utils.caching import redis_cache
 from frappe.utils.jinja import render_template
 from frappe.utils.safe_exec import safe_exec
 from frappe.website.doctype.website_slideshow.website_slideshow import get_slideshow
@@ -16,25 +17,59 @@ from frappe.website.utils import (
 	find_first_image,
 	get_comment_list,
 	get_html_content_based_on_type,
+	get_sidebar_items,
 )
 from frappe.website.website_generator import WebsiteGenerator
 
+H_TAG_PATTERN = re.compile("<h.>")
+
 
 class WebPage(WebsiteGenerator):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+		from frappe.website.doctype.web_page_block.web_page_block import WebPageBlock
+
+		breadcrumbs: DF.Code | None
+		content_type: DF.Literal["Rich Text", "Markdown", "HTML", "Page Builder", "Slideshow"]
+		context_script: DF.Code | None
+		css: DF.Code | None
+		dynamic_route: DF.Check
+		dynamic_template: DF.Check
+		enable_comments: DF.Check
+		end_date: DF.Datetime | None
+		full_width: DF.Check
+		header: DF.HTMLEditor | None
+		idx: DF.Int
+		insert_style: DF.Check
+		javascript: DF.Code | None
+		main_section: DF.TextEditor | None
+		main_section_html: DF.HTMLEditor | None
+		main_section_md: DF.MarkdownEditor | None
+		meta_description: DF.SmallText | None
+		meta_image: DF.AttachImage | None
+		meta_title: DF.Data | None
+		module: DF.Link | None
+		page_blocks: DF.Table[WebPageBlock]
+		published: DF.Check
+		route: DF.Data | None
+		show_sidebar: DF.Check
+		show_title: DF.Check
+		slideshow: DF.Link | None
+		start_date: DF.Datetime | None
+		text_align: DF.Literal["Left", "Center", "Right"]
+		title: DF.Data
+		website_sidebar: DF.Link | None
+	# end: auto-generated types
 	def validate(self):
 		self.validate_dates()
 		self.set_route()
 		if not self.dynamic_route:
 			self.route = quoted(self.route)
-
-	def get_feed(self):
-		return self.title
-
-	def on_update(self):
-		super(WebPage, self).on_update()
-
-	def on_trash(self):
-		super(WebPage, self).on_trash()
 
 	def get_context(self, context):
 		context.main_section = get_html_content_based_on_type(self, "main_section", self.content_type)
@@ -68,6 +103,9 @@ class WebPage(WebsiteGenerator):
 		if not self.show_title:
 			context["no_header"] = 1
 
+		if self.show_sidebar:
+			context.sidebar_items = get_sidebar_items(self.website_sidebar)
+
 		self.set_metatags(context)
 		self.set_breadcrumbs(context)
 		self.set_title_and_header(context)
@@ -77,15 +115,23 @@ class WebPage(WebsiteGenerator):
 
 	def render_dynamic(self, context):
 		# dynamic
-		is_jinja = context.dynamic_template or "<!-- jinja -->" in context.main_section
-		if is_jinja or ("{{" in context.main_section):
+		is_jinja = (
+			context.dynamic_template
+			or "<!-- jinja -->" in context.main_section
+			or ("{{" in context.main_section)
+		)
+		if is_jinja:
+			frappe.flags.web_block_scripts = {}
+			frappe.flags.web_block_styles = {}
 			try:
 				context["main_section"] = render_template(context.main_section, context)
 				if not "<!-- static -->" in context.main_section:
 					context["no_cache"] = 1
 			except TemplateSyntaxError:
-				if is_jinja:
-					raise
+				raise
+			finally:
+				frappe.flags.web_block_scripts = {}
+				frappe.flags.web_block_styles = {}
 
 	def set_breadcrumbs(self, context):
 		"""Build breadcrumbs template"""
@@ -114,7 +160,7 @@ class WebPage(WebsiteGenerator):
 				context.header = context.title
 
 			# add h1 tag to header
-			if context.get("header") and not re.findall("<h.>", context.header):
+			if context.get("header") and not H_TAG_PATTERN.findall(context.header):
 				context.header = "<h1>" + context.header + "</h1>"
 
 		# if title not set, set title from header
@@ -142,7 +188,7 @@ class WebPage(WebsiteGenerator):
 	def check_for_redirect(self, context):
 		if "<!-- redirect:" in context.main_section:
 			frappe.local.flags.redirect_location = (
-				context.main_section.split("<!-- redirect:")[1].split("-->")[0].strip()
+				context.main_section.split("<!-- redirect:", 2)[1].split("-->", 1)[0].strip()
 			)
 			raise frappe.Redirect
 
@@ -191,9 +237,9 @@ def check_publish_status():
 def get_web_blocks_html(blocks):
 	"""Converts a list of blocks into Raw HTML and extracts out their scripts for deduplication"""
 
-	out = frappe._dict(html="", scripts=[], styles=[])
-	extracted_scripts = []
-	extracted_styles = []
+	out = frappe._dict(html="", scripts={}, styles={})
+	extracted_scripts = {}
+	extracted_styles = {}
 	for block in blocks:
 		web_template = frappe.get_cached_doc("Web Template", block.web_template)
 		rendered_html = frappe.render_template(
@@ -207,11 +253,15 @@ def get_web_blocks_html(blocks):
 		html, scripts, styles = extract_script_and_style_tags(rendered_html)
 		out.html += html
 		if block.web_template not in extracted_scripts:
-			out.scripts += scripts
-			extracted_scripts.append(block.web_template)
+			extracted_scripts.setdefault(block.web_template, [])
+			extracted_scripts[block.web_template] += scripts
+
 		if block.web_template not in extracted_styles:
-			out.styles += styles
-			extracted_styles.append(block.web_template)
+			extracted_styles.setdefault(block.web_template, [])
+			extracted_styles[block.web_template] += styles
+
+	out.scripts = extracted_scripts
+	out.styles = extracted_styles
 
 	return out
 
@@ -232,3 +282,17 @@ def extract_script_and_style_tags(html):
 		style.extract()
 
 	return str(soup), scripts, styles
+
+
+@redis_cache(ttl=60 * 60)
+def get_dynamic_web_pages() -> dict[str, str]:
+	pages = frappe.get_all(
+		"Web Page",
+		fields=["name", "route", "modified"],
+		filters=dict(published=1, dynamic_route=1),
+		update={"doctype": "Web Page"},
+	)
+	get_web_pages_with_dynamic_routes = frappe.get_hooks("get_web_pages_with_dynamic_routes") or []
+	for method in get_web_pages_with_dynamic_routes:
+		pages.extend(frappe.get_attr(method)())
+	return pages

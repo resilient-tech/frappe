@@ -8,17 +8,39 @@ import os
 
 import frappe
 from frappe.modules.import_file import import_file_by_path
-from frappe.modules.patch_handler import block_user
+from frappe.modules.patch_handler import _patch_mode
 from frappe.utils import update_progress_bar
+
+IMPORTABLE_DOCTYPES = [
+	("core", "doctype"),
+	("core", "page"),
+	("core", "report"),
+	("desk", "dashboard_chart_source"),
+	("printing", "print_format"),
+	("website", "web_page"),
+	("website", "website_theme"),
+	("website", "web_form"),
+	("website", "web_template"),
+	("email", "notification"),
+	("printing", "print_style"),
+	("desk", "workspace"),
+	("desk", "onboarding_step"),
+	("desk", "module_onboarding"),
+	("desk", "form_tour"),
+	("custom", "client_script"),
+	("core", "server_script"),
+	("custom", "custom_field"),
+	("custom", "property_setter"),
+]
 
 
 def sync_all(force=0, reset_permissions=False):
-	block_user(True)
+	_patch_mode(True)
 
 	for app in frappe.get_installed_apps():
 		sync_for(app, force, reset_permissions=reset_permissions)
 
-	block_user(False)
+	_patch_mode(False)
 
 	frappe.clear_cache()
 
@@ -53,22 +75,6 @@ def sync_for(app_name, force=0, reset_permissions=False):
 				os.path.join(FRAPPE_PATH, "website", "doctype", website_module, f"{website_module}.json")
 			)
 
-		for data_migration_module in [
-			"data_migration_mapping_detail",
-			"data_migration_mapping",
-			"data_migration_plan_mapping",
-			"data_migration_plan",
-		]:
-			files.append(
-				os.path.join(
-					FRAPPE_PATH,
-					"data_migration",
-					"doctype",
-					data_migration_module,
-					f"{data_migration_module}.json",
-				)
-			)
-
 		for desk_module in [
 			"number_card",
 			"dashboard_chart",
@@ -80,9 +86,17 @@ def sync_for(app_name, force=0, reset_permissions=False):
 			"workspace_link",
 			"workspace_chart",
 			"workspace_shortcut",
+			"workspace_quick_list",
+			"workspace_number_card",
+			"workspace_custom_block",
 			"workspace",
 		]:
 			files.append(os.path.join(FRAPPE_PATH, "desk", "doctype", desk_module, f"{desk_module}.json"))
+
+		for module_name, document_type in IMPORTABLE_DOCTYPES:
+			file = os.path.join(FRAPPE_PATH, module_name, "doctype", document_type, f"{document_type}.json")
+			if file not in files:
+				files.append(file)
 
 	for module_name in frappe.local.app_modules.get(app_name) or []:
 		folder = os.path.dirname(frappe.get_module(app_name + "." + module_name).__file__)
@@ -99,7 +113,7 @@ def sync_for(app_name, force=0, reset_permissions=False):
 			frappe.db.commit()
 
 			# show progress bar
-			update_progress_bar("Updating DocTypes for {0}".format(app_name), i, l)
+			update_progress_bar(f"Updating DocTypes for {app_name}", i, l)
 
 		# print each progress bar on new line
 		print()
@@ -110,31 +124,7 @@ def get_doc_files(files, start_path):
 
 	files = files or []
 
-	# load in sequence - warning for devs
-	document_types = [
-		"doctype",
-		"page",
-		"report",
-		"dashboard_chart_source",
-		"print_format",
-		"web_page",
-		"website_theme",
-		"web_form",
-		"web_template",
-		"notification",
-		"print_style",
-		"data_migration_mapping",
-		"data_migration_plan",
-		"workspace",
-		"onboarding_step",
-		"module_onboarding",
-		"form_tour",
-		"client_script",
-		"server_script",
-		"custom_field",
-		"property_setter",
-	]
-	for doctype in document_types:
+	for _module, doctype in IMPORTABLE_DOCTYPES:
 		doctype_path = os.path.join(start_path, doctype)
 		if os.path.exists(doctype_path):
 			for docname in os.listdir(doctype_path):

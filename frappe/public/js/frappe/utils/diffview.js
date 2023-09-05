@@ -19,7 +19,7 @@ frappe.ui.DiffView = class DiffView {
 			filters: { docname: this.docname, ref_doctype: this.doctype },
 		});
 		const onchange = () => this.compute_diff();
-		let dialog = new frappe.ui.Dialog({
+		return new frappe.ui.Dialog({
 			title: __("Compare Versions"),
 			fields: [
 				{
@@ -56,7 +56,6 @@ frappe.ui.DiffView = class DiffView {
 			],
 			size: "extra-large",
 		});
-		return dialog;
 	}
 
 	compute_diff() {
@@ -89,7 +88,7 @@ frappe.ui.DiffView = class DiffView {
 			} else if (line.startsWith("-")) {
 				line_class = "delete";
 			}
-			html += `<div class=${line_class}>${line}</div>`;
+			html += `<div class="${line_class} text-wrap">${line}</div>`;
 		});
 		return `<div class='diffview'>${html}</div>`;
 	}

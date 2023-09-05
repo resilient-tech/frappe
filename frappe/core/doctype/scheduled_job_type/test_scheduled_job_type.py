@@ -1,14 +1,12 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and Contributors
 # License: MIT. See LICENSE
-import unittest
-
 import frappe
 from frappe.core.doctype.scheduled_job_type.scheduled_job_type import sync_jobs
+from frappe.tests.utils import FrappeTestCase
 from frappe.utils import get_datetime
 
 
-class TestScheduledJobType(unittest.TestCase):
+class TestScheduledJobType(FrappeTestCase):
 	def setUp(self):
 		frappe.db.rollback()
 		frappe.db.truncate("Scheduled Job Type")
@@ -20,7 +18,7 @@ class TestScheduledJobType(unittest.TestCase):
 		self.assertEqual(all_job.frequency, "All")
 
 		daily_job = frappe.get_doc(
-			"Scheduled Job Type", dict(method="frappe.email.queue.set_expiry_for_email_queue")
+			"Scheduled Job Type", dict(method="frappe.desk.notifications.clear_notifications")
 		)
 		self.assertEqual(daily_job.frequency, "Daily")
 
@@ -39,7 +37,7 @@ class TestScheduledJobType(unittest.TestCase):
 
 	def test_daily_job(self):
 		job = frappe.get_doc(
-			"Scheduled Job Type", dict(method="frappe.email.queue.set_expiry_for_email_queue")
+			"Scheduled Job Type", dict(method="frappe.desk.notifications.clear_notifications")
 		)
 		job.db_set("last_execution", "2019-01-01 00:00:00")
 		self.assertTrue(job.is_event_due(get_datetime("2019-01-02 00:00:06")))

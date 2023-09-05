@@ -5,14 +5,46 @@ from os.path import abspath
 from os.path import exists as path_exists
 from os.path import join as join_path
 from os.path import splitext
+from typing import Optional
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import get_path
 
 
 class WebsiteTheme(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+		from frappe.website.doctype.website_theme_ignore_app.website_theme_ignore_app import (
+			WebsiteThemeIgnoreApp,
+		)
+
+		background_color: DF.Link | None
+		button_gradients: DF.Check
+		button_rounded_corners: DF.Check
+		button_shadows: DF.Check
+		custom: DF.Check
+		custom_overrides: DF.Code | None
+		custom_scss: DF.Code | None
+		dark_color: DF.Link | None
+		font_properties: DF.Data | None
+		font_size: DF.Data | None
+		google_font: DF.Data | None
+		ignored_apps: DF.Table[WebsiteThemeIgnoreApp]
+		js: DF.Code | None
+		light_color: DF.Link | None
+		module: DF.Link
+		primary_color: DF.Link | None
+		text_color: DF.Link | None
+		theme: DF.Data
+		theme_scss: DF.Code | None
+		theme_url: DF.Data | None
+	# end: auto-generated types
 	def validate(self):
 		self.validate_if_customizable()
 		self.generate_bootstrap_theme()
@@ -61,10 +93,6 @@ class WebsiteTheme(Document):
 	def generate_bootstrap_theme(self):
 		from subprocess import PIPE, Popen
 
-		self.theme_scss = frappe.render_template(
-			"frappe/website/doctype/website_theme/website_theme_template.scss", self.as_dict()
-		)
-
 		# create theme file in site public files folder
 		folder_path = abspath(frappe.utils.get_files_path("website_theme", is_private=False))
 		# create folder if not exist
@@ -74,7 +102,7 @@ class WebsiteTheme(Document):
 			self.delete_old_theme_files(folder_path)
 
 		# add a random suffix
-		suffix = frappe.generate_hash("Website Theme", 8) if self.custom else "style"
+		suffix = frappe.generate_hash(length=8) if self.custom else "style"
 		file_name = frappe.scrub(self.name) + "_" + suffix + ".css"
 		output_path = join_path(folder_path, file_name)
 
@@ -82,14 +110,14 @@ class WebsiteTheme(Document):
 		content = content.replace("\n", "\\n")
 		command = ["node", "generate_bootstrap_theme.js", output_path, content]
 
-		process = Popen(command, cwd=frappe.get_app_path("frappe", ".."), stdout=PIPE, stderr=PIPE)
+		process = Popen(command, cwd=frappe.get_app_source_path("frappe"), stdout=PIPE, stderr=PIPE)
 
 		stderr = process.communicate()[1]
 
 		if stderr:
 			stderr = frappe.safe_decode(stderr)
 			stderr = stderr.replace("\n", "<br>")
-			frappe.throw('<div style="font-family: monospace;">{stderr}</div>'.format(stderr=stderr))
+			frappe.throw(f'<div style="font-family: monospace;">{stderr}</div>')
 		else:
 			self.theme_url = "/files/website_theme/" + file_name
 
@@ -102,18 +130,8 @@ class WebsiteTheme(Document):
 			if fname.startswith(frappe.scrub(self.name) + "_") and fname.endswith(".css"):
 				os.remove(os.path.join(folder_path, fname))
 
-	def generate_theme_if_not_exist(self):
-		bench_path = frappe.utils.get_bench_path()
-		if self.theme_url:
-			theme_path = join_path(bench_path, "sites", self.theme_url[1:])
-			if not path_exists(theme_path):
-				self.generate_bootstrap_theme()
-		else:
-			self.generate_bootstrap_theme()
-
 	@frappe.whitelist()
 	def set_as_default(self):
-		self.generate_bootstrap_theme()
 		self.save()
 		website_settings = frappe.get_doc("Website Settings")
 		website_settings.website_theme = self.name
@@ -125,26 +143,15 @@ class WebsiteTheme(Document):
 		from frappe.utils.change_log import get_versions
 
 		apps = get_versions()
-		out = []
-		for app, values in apps.items():
-			out.append({"name": app, "title": values["title"]})
-		return out
+		return [{"name": app, "title": values["title"]} for app, values in apps.items()]
 
 
-def add_website_theme(context):
-	context.theme = frappe._dict()
-
-	if not context.disable_website_theme:
-		website_theme = get_active_theme()
-		context.theme = website_theme or frappe._dict()
-
-
-def get_active_theme():
-	website_theme = frappe.db.get_single_value("Website Settings", "website_theme")
-	if website_theme:
+def get_active_theme() -> Optional["WebsiteTheme"]:
+	if website_theme := frappe.get_website_settings("website_theme"):
 		try:
-			return frappe.get_doc("Website Theme", website_theme)
+			return frappe.get_cached_doc("Website Theme", website_theme)
 		except frappe.DoesNotExistError:
+			frappe.clear_last_message()
 			pass
 
 
@@ -173,15 +180,13 @@ def get_scss_paths():
 	returned set will contain 'frappe/public/scss/website[.bundle]'.
 	"""
 	import_path_list = []
-	bench_path = frappe.utils.get_bench_path()
 
 	scss_files = ["public/scss/website.scss", "public/scss/website.bundle.scss"]
 	for app in frappe.get_installed_apps():
 		for scss_file in scss_files:
-			relative_path = join_path(app, scss_file)
-			full_path = get_path("apps", app, relative_path, base=bench_path)
+			full_path = frappe.get_app_path(app, scss_file)
 			if path_exists(full_path):
-				import_path = splitext(relative_path)[0]
+				import_path = splitext(join_path(app, scss_file))[0]
 				import_path_list.append(import_path)
 
 	return import_path_list
@@ -199,5 +204,4 @@ def after_migrate():
 		return
 
 	doc = frappe.get_doc("Website Theme", website_theme)
-	doc.generate_bootstrap_theme()
-	doc.save()
+	doc.save()  # Just re-saving re-generates the theme.

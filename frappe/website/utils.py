@@ -5,7 +5,6 @@ import mimetypes
 import os
 import re
 from functools import lru_cache, wraps
-from typing import Dict, Optional
 
 import yaml
 from werkzeug.wrappers import Response
@@ -13,23 +12,29 @@ from werkzeug.wrappers import Response
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import md_to_html
+from frappe.utils import cint, cstr, get_assets_json, get_system_timezone, md_to_html
+
+FRONTMATTER_PATTERN = re.compile(r"^\s*(?:---|\+\+\+)(.*?)(?:---|\+\+\+)\s*(.+)$", re.S | re.M)
+H1_TAG_PATTERN = re.compile("<h1>([^<]*)")
+IMAGE_TAG_PATTERN = re.compile(r"""<img[^>]*src\s?=\s?['"]([^'"]*)['"]""")
+CLEANUP_PATTERN_1 = re.compile(r'[~!@#$%^&*+()<>,."\'\?]')
+CLEANUP_PATTERN_2 = re.compile("[:/]")
+CLEANUP_PATTERN_3 = re.compile(r"(-)\1+")
 
 
 def delete_page_cache(path):
-	cache = frappe.cache()
-	cache.delete_value("full_index")
+	frappe.cache.delete_value("full_index")
 	groups = ("website_page", "page_context")
 	if path:
 		for name in groups:
-			cache.hdel(name, path)
+			frappe.cache.hdel(name, path)
 	else:
 		for name in groups:
-			cache.delete_key(name)
+			frappe.cache.delete_key(name)
 
 
 def find_first_image(html):
-	m = re.finditer(r"""<img[^>]*src\s?=\s?['"]([^'"]*)['"]""", html)
+	m = IMAGE_TAG_PATTERN.finditer(html)
 	try:
 		return next(m).groups()[0]
 	except StopIteration:
@@ -74,9 +79,9 @@ def get_comment_list(doctype, name):
 			reference_name=name,
 		),
 		or_filters=[
-			["recipients", "like", "%{0}%".format(frappe.session.user)],
-			["cc", "like", "%{0}%".format(frappe.session.user)],
-			["bcc", "like", "%{0}%".format(frappe.session.user)],
+			["recipients", "like", f"%{frappe.session.user}%"],
+			["cc", "like", f"%{frappe.session.user}%"],
+			["bcc", "like", f"%{frappe.session.user}%"],
 		],
 	)
 
@@ -121,7 +126,7 @@ def get_home_page():
 		# dont return cached homepage in development
 		return _get_home_page()
 
-	return frappe.cache().hget("home_page", frappe.session.user, _get_home_page)
+	return frappe.cache.hget("home_page", frappe.session.user, _get_home_page)
 
 
 def get_home_page_via_hooks():
@@ -152,27 +157,39 @@ def get_home_page_via_hooks():
 	return home_page
 
 
+def get_boot_data():
+	return {
+		"lang": "en",
+		"sysdefaults": {
+			"float_precision": cint(frappe.get_system_settings("float_precision")) or 3,
+			"date_format": frappe.get_system_settings("date_format") or "yyyy-mm-dd",
+			"time_format": frappe.get_system_settings("time_format") or "HH:mm:ss",
+		},
+		"time_zone": {
+			"system": get_system_timezone(),
+			"user": frappe.db.get_value("User", frappe.session.user, "time_zone") or get_system_timezone(),
+		},
+		"assets_json": get_assets_json(),
+		"sitename": frappe.local.site,
+	}
+
+
 def is_signup_disabled():
 	return frappe.db.get_single_value("Website Settings", "disable_signup", True)
 
 
-def cleanup_page_name(title):
+def cleanup_page_name(title: str) -> str:
 	"""make page name from title"""
 	if not title:
 		return ""
 
 	name = title.lower()
-	name = re.sub(r'[~!@#$%^&*+()<>,."\'\?]', "", name)
-	name = re.sub("[:/]", "-", name)
+	name = CLEANUP_PATTERN_1.sub("", name)
+	name = CLEANUP_PATTERN_2.sub("-", name)
 	name = "-".join(name.split())
 	# replace repeating hyphens
-	name = re.sub(r"(-)\1+", r"\1", name)
+	name = CLEANUP_PATTERN_3.sub(r"\1", name)
 	return name[:140]
-
-
-def get_shade(color, percent=None):
-	frappe.msgprint(_("get_shade method has been deprecated."))
-	return color
 
 
 def abs_url(path):
@@ -216,14 +233,11 @@ def get_next_link(route, url_prefix=None, app=None):
 
 	if next_item:
 		if next_item.route and next_item.title:
-			html = (
+			return (
 				'<p class="btn-next-wrapper">'
 				+ frappe._("Next")
 				+ ': <a class="btn-next" href="{url_prefix}{route}">{title}</a></p>'
 			).format(**next_item)
-
-			return html
-
 	return ""
 
 
@@ -274,7 +288,7 @@ def get_full_index(route=None, app=None):
 
 			return children_map
 
-		children_map = frappe.cache().get_value("website_full_index", _build)
+		children_map = frappe.cache.get_value("website_full_index", _build)
 
 		frappe.local.flags.children_map = children_map
 
@@ -287,8 +301,8 @@ def extract_title(source, path):
 
 	if not title and "<h1>" in source:
 		# extract title from h1
-		match = re.findall("<h1>([^<]*)", source)
-		title_content = match[0].strip()[:300]
+		match = H1_TAG_PATTERN.search(source).group()
+		title_content = match.strip()[:300]
 		if "{{" not in title_content:
 			title = title_content
 
@@ -308,17 +322,14 @@ def extract_title(source, path):
 	return title
 
 
-def extract_comment_tag(source, tag):
+def extract_comment_tag(source: str, tag: str):
 	"""Extract custom tags in comments from source.
 
 	:param source: raw template source in HTML
 	:param title: tag to search, example "title"
 	"""
-
-	if "<!-- {0}:".format(tag) in source:
-		return re.findall("<!-- {0}:([^>]*) -->".format(tag), source)[0].strip()
-	else:
-		return None
+	matched_pattern = re.search(f"<!-- {tag}:([^>]*) -->", source)
+	return matched_pattern.groups()[0].strip() if matched_pattern else None
 
 
 def get_html_content_based_on_type(doc, fieldname, content_type):
@@ -341,12 +352,23 @@ def get_html_content_based_on_type(doc, fieldname, content_type):
 def clear_cache(path=None):
 	"""Clear website caches
 	:param path: (optional) for the given path"""
-	for key in ("website_generator_routes", "website_pages", "website_full_index", "sitemap_routes"):
-		frappe.cache().delete_value(key)
+	from frappe.website.router import clear_routing_cache
 
-	frappe.cache().delete_value("website_404")
+	for key in (
+		"website_generator_routes",
+		"website_pages",
+		"website_full_index",
+		"sitemap_routes",
+		"languages_with_name",
+		"languages",
+	):
+		frappe.cache.delete_value(key)
+
+	clear_routing_cache()
+
+	frappe.cache.delete_value("website_404")
 	if path:
-		frappe.cache().hdel("website_redirects", path)
+		frappe.cache.hdel("website_redirects", path)
 		delete_page_cache(path)
 	else:
 		clear_sitemap()
@@ -360,7 +382,7 @@ def clear_cache(path=None):
 			"page_context",
 			"website_page",
 		):
-			frappe.cache().delete_value(key)
+			frappe.cache.delete_value(key)
 
 	for method in frappe.get_hooks("website_clear_cache"):
 		frappe.get_attr(method)(path)
@@ -378,7 +400,8 @@ def get_frontmatter(string):
 	"Reference: https://github.com/jonbeebe/frontmatter"
 	frontmatter = ""
 	body = ""
-	result = re.compile(r"^\s*(?:---|\+\+\+)(.*?)(?:---|\+\+\+)\s*(.+)$", re.S | re.M).search(string)
+	result = FRONTMATTER_PATTERN.search(string)
+
 	if result:
 		frontmatter = result.group(1)
 		body = result.group(2)
@@ -389,7 +412,7 @@ def get_frontmatter(string):
 	}
 
 
-def get_sidebar_items(parent_sidebar, basepath):
+def get_sidebar_items(parent_sidebar, basepath=None):
 	import frappe.www.list
 
 	sidebar_items = []
@@ -415,7 +438,7 @@ def get_sidebar_items(parent_sidebar, basepath):
 
 
 def get_portal_sidebar_items():
-	sidebar_items = frappe.cache().hget("portal_menu_items", frappe.session.user)
+	sidebar_items = frappe.cache.hget("portal_menu_items", frappe.session.user)
 	if sidebar_items is None:
 		sidebar_items = []
 		roles = frappe.get_roles()
@@ -438,7 +461,7 @@ def get_portal_sidebar_items():
 				i["enabled"] = 1
 			add_items(sidebar_items, items_via_hooks)
 
-		frappe.cache().hset("portal_menu_items", frappe.session.user, sidebar_items)
+		frappe.cache.hset("portal_menu_items", frappe.session.user, sidebar_items)
 
 	return sidebar_items
 
@@ -449,7 +472,7 @@ def get_sidebar_items_from_sidebar_file(basepath, look_for_sidebar_json):
 	if not sidebar_json_path:
 		return sidebar_items
 
-	with open(sidebar_json_path, "r") as sidebarfile:
+	with open(sidebar_json_path) as sidebarfile:
 		try:
 			sidebar_json = sidebarfile.read()
 			sidebar_items = json.loads(sidebar_json)
@@ -483,7 +506,7 @@ def cache_html(func):
 	def cache_html_decorator(*args, **kwargs):
 		if can_cache():
 			html = None
-			page_cache = frappe.cache().hget("website_page", args[0].path)
+			page_cache = frappe.cache.hget("website_page", args[0].path)
 			if page_cache and frappe.local.lang in page_cache:
 				html = page_cache[frappe.local.lang]
 			if html:
@@ -492,27 +515,28 @@ def cache_html(func):
 		html = func(*args, **kwargs)
 		context = args[0].context
 		if can_cache(context.no_cache):
-			page_cache = frappe.cache().hget("website_page", args[0].path) or {}
+			page_cache = frappe.cache.hget("website_page", args[0].path) or {}
 			page_cache[frappe.local.lang] = html
-			frappe.cache().hset("website_page", args[0].path, page_cache)
+			frappe.cache.hset("website_page", args[0].path, page_cache)
 
 		return html
 
 	return cache_html_decorator
 
 
-def build_response(path, data, http_status_code, headers: Optional[Dict] = None):
+def build_response(path, data, http_status_code, headers: dict | None = None):
 	# build response
 	response = Response()
 	response.data = set_content_type(response, data, path)
 	response.status_code = http_status_code
-	response.headers["X-Page-Name"] = path.encode("ascii", errors="xmlcharrefreplace")
+	response.headers["X-Page-Name"] = cstr(path.encode("ascii", errors="xmlcharrefreplace"))
 	response.headers["X-From-Cache"] = frappe.local.response.from_cache or False
 
-	add_preload_headers(response)
+	add_preload_for_bundled_assets(response)
+
 	if headers:
 		for key, val in headers.items():
-			response.headers[key] = val.encode("ascii", errors="xmlcharrefreplace")
+			response.headers[key] = cstr(val.encode("ascii", errors="xmlcharrefreplace"))
 
 	return response
 
@@ -520,12 +544,10 @@ def build_response(path, data, http_status_code, headers: Optional[Dict] = None)
 def set_content_type(response, data, path):
 	if isinstance(data, dict):
 		response.mimetype = "application/json"
-		response.charset = "utf-8"
 		data = json.dumps(data)
 		return data
 
 	response.mimetype = "text/html"
-	response.charset = "utf-8"
 
 	# ignore paths ending with .com to avoid unnecessary download
 	# https://bugs.python.org/issue22347
@@ -539,32 +561,15 @@ def set_content_type(response, data, path):
 	return data
 
 
-def add_preload_headers(response):
-	from bs4 import BeautifulSoup, SoupStrainer
+def add_preload_for_bundled_assets(response):
+	links = [f"<{css}>; rel=preload; as=style" for css in frappe.local.preload_assets["style"]]
 
-	try:
-		preload = []
-		strainer = SoupStrainer(re.compile("script|link"))
-		soup = BeautifulSoup(response.data, "lxml", parse_only=strainer)
-		for elem in soup.find_all("script", src=re.compile(".*")):
-			preload.append(("script", elem.get("src")))
-
-		for elem in soup.find_all("link", rel="stylesheet"):
-			preload.append(("style", elem.get("href")))
-
-		links = []
-		for _type, link in preload:
-			links.append("<{}>; rel=preload; as={}".format(link, _type))
-
-		if links:
-			response.headers["Link"] = ",".join(links)
-	except Exception:
-		import traceback
-
-		traceback.print_exc()
+	links.extend(f"<{js}>; rel=preload; as=script" for js in frappe.local.preload_assets["script"])
+	if links:
+		response.headers["Link"] = ",".join(links)
 
 
-@lru_cache()
+@lru_cache
 def is_binary_file(path):
 	# ref: https://stackoverflow.com/a/7392391/10309266
 	textchars = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)) - {0x7F})

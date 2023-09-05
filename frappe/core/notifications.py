@@ -2,8 +2,6 @@
 # License: MIT. See LICENSE
 
 import frappe
-from frappe.query_builder import DocType, Interval
-from frappe.query_builder.functions import Now
 
 
 def get_notification_config():
@@ -13,7 +11,6 @@ def get_notification_config():
 			"Communication": {"status": "Open", "communication_type": "Communication"},
 			"ToDo": "frappe.core.notifications.get_things_todo",
 			"Event": "frappe.core.notifications.get_todays_events",
-			"Error Snapshot": {"seen": 0, "parent_error_snapshot": None},
 			"Workflow Action": {"status": "Open"},
 		},
 	}
@@ -34,11 +31,10 @@ def get_things_todo(as_list=False):
 
 	if as_list:
 		return data
-	else:
-		return data[0][0]
+	return data[0][0]
 
 
-def get_todays_events(as_list=False):
+def get_todays_events(as_list: bool = False):
 	"""Returns a count of todays events in calendar"""
 	from frappe.desk.doctype.event.event import get_events
 	from frappe.utils import nowdate

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and contributors
 # License: MIT. See LICENSE
 
@@ -12,6 +11,33 @@ from frappe.utils.user import UserPermissions
 
 
 class DesktopIcon(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		_doctype: DF.Link | None
+		_report: DF.Link | None
+		app: DF.Data | None
+		blocked: DF.Check
+		category: DF.Data | None
+		color: DF.Data | None
+		custom: DF.Check
+		description: DF.SmallText | None
+		force_show: DF.Check
+		hidden: DF.Check
+		icon: DF.Data | None
+		idx: DF.Int
+		label: DF.Data | None
+		link: DF.SmallText | None
+		module_name: DF.Data | None
+		reverse: DF.Check
+		standard: DF.Check
+		type: DF.Literal["module", "list", "link", "page", "query-report"]
+	# end: auto-generated types
 	def validate(self):
 		if not self.label:
 			self.label = self.module_name
@@ -29,7 +55,7 @@ def get_desktop_icons(user=None):
 	if not user:
 		user = frappe.session.user
 
-	user_icons = frappe.cache().hget("desktop_icons", user)
+	user_icons = frappe.cache.hget("desktop_icons", user)
 
 	if not user_icons:
 		fields = [
@@ -62,7 +88,7 @@ def get_desktop_icons(user=None):
 
 		blocked_doctypes = [d.get("name") for d in blocked_doctypes]
 
-		standard_icons = frappe.db.get_all("Desktop Icon", fields=fields, filters={"standard": 1})
+		standard_icons = frappe.get_all("Desktop Icon", fields=fields, filters={"standard": 1})
 
 		standard_map = {}
 		for icon in standard_icons:
@@ -70,7 +96,7 @@ def get_desktop_icons(user=None):
 				icon.blocked = 1
 			standard_map[icon.module_name] = icon
 
-		user_icons = frappe.db.get_all(
+		user_icons = frappe.get_all(
 			"Desktop Icon", fields=fields, filters={"standard": 0, "owner": user}
 		)
 
@@ -121,7 +147,7 @@ def get_desktop_icons(user=None):
 			if d.label:
 				d.label = _(d.label)
 
-		frappe.cache().hset("desktop_icons", user, user_icons)
+		frappe.cache.hset("desktop_icons", user, user_icons)
 
 	return user_icons
 
@@ -133,7 +159,7 @@ def add_user_icon(_doctype, _report=None, label=None, link=None, type="link", st
 	if not label:
 		label = _doctype or _report
 	if not link:
-		link = "List/{0}".format(_doctype)
+		link = f"List/{_doctype}"
 
 	# find if a standard icon exists
 	icon_name = frappe.db.exists(
@@ -314,8 +340,8 @@ def get_all_icons():
 
 
 def clear_desktop_icons_cache(user=None):
-	frappe.cache().hdel("desktop_icons", user or frappe.session.user)
-	frappe.cache().hdel("bootinfo", user or frappe.session.user)
+	frappe.cache.hdel("desktop_icons", user or frappe.session.user)
+	frappe.cache.hdel("bootinfo", user or frappe.session.user)
 
 
 def get_user_copy(module_name, user=None):
@@ -431,7 +457,7 @@ def get_context(context):
 	context.user = frappe.session.user
 
 	if "System Manager" in frappe.get_roles():
-		context.users = frappe.db.get_all(
+		context.users = frappe.get_all(
 			"User",
 			filters={"user_type": "System User", "enabled": 1},
 			fields=["name", "first_name", "last_name"],
@@ -444,9 +470,9 @@ def get_module_icons(user=None):
 		frappe.only_for("System Manager")
 
 	if not user:
-		icons = frappe.db.get_all("Desktop Icon", fields="*", filters={"standard": 1}, order_by="idx")
+		icons = frappe.get_all("Desktop Icon", fields="*", filters={"standard": 1}, order_by="idx")
 	else:
-		frappe.cache().hdel("desktop_icons", user)
+		frappe.cache.hdel("desktop_icons", user)
 		icons = get_user_icons(user)
 
 	for icon in icons:

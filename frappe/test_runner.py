@@ -41,14 +41,13 @@ def main(
 	app=None,
 	module=None,
 	doctype=None,
+	module_def=None,
 	verbose=False,
 	tests=(),
 	force=False,
 	profile=False,
 	junit_xml_output=None,
-	ui_tests=False,
 	doctype_list_path=None,
-	skip_test_records=False,
 	failfast=False,
 	case=None,
 ):
@@ -56,13 +55,8 @@ def main(
 
 	if doctype_list_path:
 		app, doctype_list_path = doctype_list_path.split(os.path.sep, 1)
-		with open(frappe.get_app_path(app, doctype_list_path), "r") as f:
+		with open(frappe.get_app_path(app, doctype_list_path)) as f:
 			doctype = f.read().strip().splitlines()
-
-	if ui_tests:
-		print(
-			"Selenium testing has been deprecated\nUse bench --site {site_name} run-ui-tests for Cypress tests"
-		)
 
 	xmloutput_fh = None
 	if junit_xml_output:
@@ -85,7 +79,6 @@ def main(
 			frappe.utils.scheduler.disable_scheduler()
 
 		set_test_email_config()
-		frappe.conf.update({"bench_id": "test_bench", "use_rq_auth": False})
 
 		if not frappe.flags.skip_before_tests:
 			if verbose:
@@ -96,6 +89,13 @@ def main(
 		if doctype:
 			ret = run_tests_for_doctype(
 				doctype, verbose, tests, force, profile, failfast=failfast, junit_xml_output=junit_xml_output
+			)
+		elif module_def:
+			doctypes = frappe.db.get_list(
+				"DocType", filters={"module": module_def, "istable": 0}, pluck="name"
+			)
+			ret = run_tests_for_doctype(
+				doctypes, verbose, tests, force, profile, failfast=failfast, junit_xml_output=junit_xml_output
 			)
 		elif module:
 			ret = run_tests_for_module(
@@ -108,9 +108,7 @@ def main(
 				case=case,
 			)
 		else:
-			ret = run_all_tests(
-				app, verbose, profile, ui_tests, failfast=failfast, junit_xml_output=junit_xml_output
-			)
+			ret = run_all_tests(app, verbose, profile, failfast=failfast, junit_xml_output=junit_xml_output)
 
 		if not scheduler_disabled_by_user:
 			frappe.utils.scheduler.enable_scheduler()
@@ -135,34 +133,31 @@ def set_test_email_config():
 			"mail_server": "smtp.example.com",
 			"mail_login": "test@example.com",
 			"mail_password": "test",
-			"admin_password": "admin",
 		}
 	)
 
 
 class TimeLoggingTestResult(unittest.TextTestResult):
 	def startTest(self, test):
-		self._started_at = time.time()
-		super(TimeLoggingTestResult, self).startTest(test)
+		self._started_at = time.monotonic()
+		super().startTest(test)
 
 	def addSuccess(self, test):
-		elapsed = time.time() - self._started_at
+		elapsed = time.monotonic() - self._started_at
 		name = self.getDescription(test)
 		if elapsed >= SLOW_TEST_THRESHOLD:
-			self.stream.write("\n{} ({:.03}s)\n".format(name, elapsed))
-		super(TimeLoggingTestResult, self).addSuccess(test)
+			self.stream.write(f"\n{name} ({elapsed:.03}s)\n")
+		super().addSuccess(test)
 
 
-def run_all_tests(
-	app=None, verbose=False, profile=False, ui_tests=False, failfast=False, junit_xml_output=False
-):
+def run_all_tests(app=None, verbose=False, profile=False, failfast=False, junit_xml_output=False):
 	import os
 
 	apps = [app] if app else frappe.get_installed_apps()
 
 	test_suite = unittest.TestSuite()
 	for app in apps:
-		for path, folders, files in os.walk(frappe.get_pymodule_path(app)):
+		for path, folders, files in os.walk(frappe.get_app_path(app)):
 			for dontwalk in ("locals", ".git", "public", "__pycache__"):
 				if dontwalk in folders:
 					folders.remove(dontwalk)
@@ -175,7 +170,7 @@ def run_all_tests(
 			for filename in files:
 				if filename.startswith("test_") and filename.endswith(".py") and filename != "test_runner.py":
 					# print filename[:-3]
-					_add_test(app, path, filename, verbose, test_suite, ui_tests)
+					_add_test(app, path, filename, verbose, test_suite)
 
 	if junit_xml_output:
 		runner = unittest_runner(verbosity=1 + cint(verbose), failfast=failfast)
@@ -219,7 +214,7 @@ def run_tests_for_doctype(
 	for doctype in doctypes:
 		module = frappe.db.get_value("DocType", doctype, "module")
 		if not module:
-			print("Invalid doctype {0}".format(doctype))
+			print(f"Invalid doctype {doctype}")
 			sys.exit(1)
 
 		test_module = get_module_name(doctype, module, "test_")
@@ -310,14 +305,14 @@ def _run_unittest(
 	return out
 
 
-def _add_test(app, path, filename, verbose, test_suite=None, ui_tests=False):
+def _add_test(app, path, filename, verbose, test_suite=None):
 	import os
 
 	if os.path.sep.join(["doctype", "doctype", "boilerplate"]) in path:
 		# in /doctype/doctype/boilerplate/
 		return
 
-	app_path = frappe.get_pymodule_path(app)
+	app_path = frappe.get_app_path(app)
 	relative_path = os.path.relpath(path, app_path)
 	if relative_path == ".":
 		module_name = app
@@ -332,18 +327,13 @@ def _add_test(app, path, filename, verbose, test_suite=None, ui_tests=False):
 		for doctype in module.test_dependencies:
 			make_test_records(doctype, verbose=verbose, commit=True)
 
-	is_ui_test = True if hasattr(module, "TestDriver") else False
-
-	if is_ui_test != ui_tests:
-		return
-
 	if not test_suite:
 		test_suite = unittest.TestSuite()
 
 	if os.path.basename(os.path.dirname(path)) == "doctype":
 		txt_file = os.path.join(path, filename[5:].replace(".py", ".json"))
 		if os.path.exists(txt_file):
-			with open(txt_file, "r") as f:
+			with open(txt_file) as f:
 				doc = json.loads(f.read())
 			doctype = doc["name"]
 			make_test_records(doctype, verbose, commit=True)
@@ -527,7 +517,7 @@ def get_test_record_log():
 	"""Return the list of doctypes for which test records have been created"""
 	if "test_record_log" not in frappe.flags:
 		if os.path.exists(frappe.get_site_path(".test_log")):
-			with open(frappe.get_site_path(".test_log"), "r") as f:
+			with open(frappe.get_site_path(".test_log")) as f:
 				frappe.flags.test_record_log = f.read().splitlines()
 		else:
 			frappe.flags.test_record_log = []

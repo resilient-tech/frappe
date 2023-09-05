@@ -125,11 +125,11 @@ def get_list_data(
 def set_route(context):
 	"""Set link for the list item"""
 	if context.web_form_name:
-		context.route = "{0}?name={1}".format(context.pathname, quoted(context.doc.name))
+		context.route = f"{context.pathname}?name={quoted(context.doc.name)}"
 	elif context.doc and getattr(context.doc, "route", None):
 		context.route = context.doc.route
 	else:
-		context.route = "{0}/{1}".format(
+		context.route = "{}/{}".format(
 			context.pathname or quoted(context.doc.doctype), quoted(context.doc.name)
 		)
 
@@ -163,6 +163,7 @@ def prepare_filters(doctype, controller, kwargs):
 
 def get_list_context(context, doctype, web_form_name=None):
 	from frappe.modules import load_doctype_module
+	from frappe.website.doctype.web_form.web_form import get_web_form_module
 
 	list_context = context or frappe._dict()
 	meta = frappe.get_meta(doctype)
@@ -193,7 +194,7 @@ def get_list_context(context, doctype, web_form_name=None):
 	# get context from web form module
 	if web_form_name:
 		web_form = frappe.get_doc("Web Form", web_form_name)
-		list_context = update_context_from_module(web_form.get_web_form_module(), list_context)
+		list_context = update_context_from_module(get_web_form_module(web_form), list_context)
 
 	# get path from '/templates/' folder of the doctype
 	if not meta.custom and not list_context.row_template:
@@ -226,9 +227,11 @@ def get_list(
 
 	if txt:
 		if meta.search_fields:
-			for f in meta.get_search_fields():
-				if f == "name" or meta.get_field(f).fieldtype in ("Data", "Text", "Small Text", "Text Editor"):
-					or_filters.append([doctype, f, "like", "%" + txt + "%"])
+			or_filters.extend(
+				[doctype, f, "like", "%" + txt + "%"]
+				for f in meta.get_search_fields()
+				if f == "name" or meta.get_field(f).fieldtype in ("Data", "Text", "Small Text", "Text Editor")
+			)
 		else:
 			if isinstance(filters, dict):
 				filters["name"] = ("like", "%" + txt + "%")

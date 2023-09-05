@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -10,6 +9,17 @@ from frappe.model.document import Document
 
 
 class SessionDefaultSettings(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.core.doctype.session_default.session_default import SessionDefault
+		from frappe.types import DF
+
+		session_defaults: DF.Table[SessionDefault]
+	# end: auto-generated types
 	pass
 
 

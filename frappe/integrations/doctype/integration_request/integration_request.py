@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2015, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -10,9 +9,37 @@ from frappe.model.document import Document
 
 
 class IntegrationRequest(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		data: DF.Code | None
+		error: DF.Code | None
+		integration_request_service: DF.Data | None
+		is_remote_request: DF.Check
+		output: DF.Code | None
+		reference_docname: DF.DynamicLink | None
+		reference_doctype: DF.Link | None
+		request_description: DF.Data | None
+		request_headers: DF.Code | None
+		request_id: DF.Data | None
+		status: DF.Literal["", "Queued", "Authorized", "Completed", "Cancelled", "Failed"]
+		url: DF.Data | None
+	# end: auto-generated types
 	def autoname(self):
 		if self.flags._name:
 			self.name = self.flags._name
+
+	def clear_old_logs(days=30):
+		from frappe.query_builder import Interval
+		from frappe.query_builder.functions import Now
+
+		table = frappe.qb.DocType("Integration Request")
+		frappe.db.delete(table, filters=(table.modified < (Now() - Interval(days=days))))
 
 	def update_status(self, params, status):
 		data = json.loads(self.data)

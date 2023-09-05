@@ -4,6 +4,17 @@ import re
 from bleach_allowlist import bleach_allowlist
 
 import frappe
+from frappe.utils.data import escape_html
+
+EMOJI_PATTERN = re.compile(
+	"(\ud83d[\ude00-\ude4f])|"
+	"(\ud83c[\udf00-\uffff])|"
+	"(\ud83d[\u0000-\uddff])|"
+	"(\ud83d[\ude80-\udeff])|"
+	"(\ud83c[\udde0-\uddff])"
+	"+",
+	flags=re.UNICODE,
+)
 
 
 def clean_html(html):
@@ -14,7 +25,7 @@ def clean_html(html):
 
 	return bleach.clean(
 		clean_script_and_style(html),
-		tags=[
+		tags={
 			"div",
 			"p",
 			"br",
@@ -31,9 +42,8 @@ def clean_html(html):
 			"tbody",
 			"td",
 			"tr",
-		],
+		},
 		attributes=[],
-		styles=["color", "border", "border-color"],
 		strip=True,
 		strip_comments=True,
 	)
@@ -41,44 +51,13 @@ def clean_html(html):
 
 def clean_email_html(html):
 	import bleach
+	from bleach.css_sanitizer import CSSSanitizer
 
 	if not isinstance(html, str):
 		return html
 
-	return bleach.clean(
-		clean_script_and_style(html),
-		tags=[
-			"div",
-			"p",
-			"br",
-			"ul",
-			"ol",
-			"li",
-			"strong",
-			"b",
-			"em",
-			"i",
-			"u",
-			"a",
-			"table",
-			"thead",
-			"tbody",
-			"td",
-			"tr",
-			"th",
-			"pre",
-			"code",
-			"h1",
-			"h2",
-			"h3",
-			"h4",
-			"h5",
-			"h6",
-			"button",
-			"img",
-		],
-		attributes=["border", "colspan", "rowspan", "src", "href", "style", "id"],
-		styles=[
+	css_sanitizer = CSSSanitizer(
+		allowed_css_properties=[
 			"color",
 			"border-color",
 			"width",
@@ -110,7 +89,43 @@ def clean_email_html(html):
 			"text-align",
 			"vertical-align",
 			"display",
-		],
+		]
+	)
+
+	return bleach.clean(
+		clean_script_and_style(html),
+		tags={
+			"div",
+			"p",
+			"br",
+			"ul",
+			"ol",
+			"li",
+			"strong",
+			"b",
+			"em",
+			"i",
+			"u",
+			"a",
+			"table",
+			"thead",
+			"tbody",
+			"td",
+			"tr",
+			"th",
+			"pre",
+			"code",
+			"h1",
+			"h2",
+			"h3",
+			"h4",
+			"h5",
+			"h6",
+			"button",
+			"img",
+		},
+		attributes=["border", "colspan", "rowspan", "src", "href", "style", "id"],
+		css_sanitizer=css_sanitizer,
 		protocols=["cid", "http", "https", "mailto", "data"],
 		strip=True,
 		strip_comments=True,
@@ -135,6 +150,7 @@ def sanitize_html(html, linkify=False):
 	Does not sanitize JSON, as it could lead to future problems
 	"""
 	import bleach
+	from bleach.css_sanitizer import CSSSanitizer
 	from bs4 import BeautifulSoup
 
 	if not isinstance(html, str):
@@ -152,18 +168,23 @@ def sanitize_html(html, linkify=False):
 		+ mathml_elements
 		+ ["html", "head", "meta", "link", "body", "style", "o:p"]
 	)
-	attributes = {"*": acceptable_attributes, "svg": svg_attributes}
-	styles = bleach_allowlist.all_styles
-	strip_comments = False
+
+	def attributes_filter(tag, name, value):
+		if name.startswith("data-"):
+			return True
+		return name in acceptable_attributes
+
+	attributes = {"*": attributes_filter, "svg": svg_attributes}
+	css_sanitizer = CSSSanitizer(allowed_css_properties=bleach_allowlist.all_styles)
 
 	# returns html with escaped tags, escaped orphan >, <, etc.
 	escaped_html = bleach.clean(
 		html,
 		tags=tags,
 		attributes=attributes,
-		styles=styles,
-		strip_comments=strip_comments,
-		protocols=["cid", "http", "https", "mailto"],
+		css_sanitizer=css_sanitizer,
+		strip_comments=False,
+		protocols={"cid", "http", "https", "mailto"},
 	)
 
 	return escaped_html
@@ -181,28 +202,19 @@ def is_json(text):
 def get_icon_html(icon, small=False):
 	from frappe.utils import is_image
 
-	emoji_pattern = re.compile(
-		"(\ud83d[\ude00-\ude4f])|"
-		"(\ud83c[\udf00-\uffff])|"
-		"(\ud83d[\u0000-\uddff])|"
-		"(\ud83d[\ude80-\udeff])|"
-		"(\ud83c[\udde0-\uddff])"
-		"+",
-		flags=re.UNICODE,
-	)
-
 	icon = icon or ""
-	if icon and emoji_pattern.match(icon):
-		return '<span class="text-muted">' + icon + "</span>"
+
+	if icon and EMOJI_PATTERN.match(icon):
+		return f'<span class="text-muted">{icon}</span>'
 
 	if is_image(icon):
 		return (
-			'<img style="width: 16px; height: 16px;" src="{icon}">'.format(icon=icon)
+			f"<img style='width: 16px; height: 16px;' src={escape_html(icon)!r}>"
 			if small
-			else '<img src="{icon}">'.format(icon=icon)
+			else f"<img src={escape_html(icon)!r}>"
 		)
 	else:
-		return "<i class='{icon}'></i>".format(icon=icon)
+		return f"<i class={escape_html(icon)!r}></i>"
 
 
 def unescape_html(value):
@@ -272,6 +284,7 @@ acceptable_elements = [
 	"li",
 	"m",
 	"map",
+	"mark",
 	"menu",
 	"meter",
 	"multicol",
@@ -418,6 +431,7 @@ acceptable_attributes = [
 	"cols",
 	"colspan",
 	"compact",
+	"content",
 	"contenteditable",
 	"controls",
 	"coords",
@@ -615,6 +629,7 @@ svg_attributes = [
 	"color",
 	"color-rendering",
 	"content",
+	"colwidth",
 	"cx",
 	"cy",
 	"d",

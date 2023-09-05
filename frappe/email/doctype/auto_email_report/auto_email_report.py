@@ -1,9 +1,9 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2015, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
 import calendar
 from datetime import timedelta
+from email.utils import formataddr
 
 import frappe
 from frappe import _
@@ -27,6 +27,38 @@ from frappe.utils.xlsxutils import make_xlsx
 
 
 class AutoEmailReport(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		data_modified_till: DF.Int
+		day_of_week: DF.Literal[
+			"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+		]
+		description: DF.TextEditor | None
+		dynamic_date_period: DF.Literal[
+			"", "Daily", "Weekly", "Monthly", "Quarterly", "Half Yearly", "Yearly"
+		]
+		email_to: DF.SmallText
+		enabled: DF.Check
+		filter_meta: DF.Text | None
+		filters: DF.Text | None
+		format: DF.Literal["HTML", "XLSX", "CSV"]
+		frequency: DF.Literal["Daily", "Weekdays", "Weekly", "Monthly"]
+		from_date_field: DF.Literal
+		no_of_rows: DF.Int
+		reference_report: DF.Data | None
+		report: DF.Link
+		report_type: DF.ReadOnly | None
+		send_if_data: DF.Check
+		sender: DF.Link | None
+		to_date_field: DF.Literal
+		user: DF.Link
+	# end: auto-generated types
 	def autoname(self):
 		self.name = _(self.report)
 		if frappe.db.exists("Auto Email Report", self.name):
@@ -37,6 +69,10 @@ class AutoEmailReport(Document):
 		self.validate_emails()
 		self.validate_report_format()
 		self.validate_mandatory_fields()
+
+	@property
+	def sender_email(self):
+		return frappe.db.get_value("Email Account", self.sender, "email_id")
 
 	def validate_emails(self):
 		"""Cleanup list of emails"""
@@ -79,10 +115,9 @@ class AutoEmailReport(Document):
 		# Check if all Mandatory Report Filters are filled by the User
 		filters = frappe.parse_json(self.filters) if self.filters else {}
 		filter_meta = frappe.parse_json(self.filter_meta) if self.filter_meta else {}
-		throw_list = []
-		for meta in filter_meta:
-			if meta.get("reqd") and not filters.get(meta["fieldname"]):
-				throw_list.append(meta["label"])
+		throw_list = [
+			meta["label"] for meta in filter_meta if meta.get("reqd") and not filters.get(meta["fieldname"])
+		]
 		if throw_list:
 			frappe.throw(
 				title=_("Missing Filters Required"),
@@ -110,6 +145,7 @@ class AutoEmailReport(Document):
 			filters=self.filters,
 			as_dict=True,
 			ignore_prepared_report=True,
+			are_default_filters=False,
 		)
 
 		# add serial numbers
@@ -165,7 +201,7 @@ class AutoEmailReport(Document):
 		)
 
 	def get_file_name(self):
-		return "{0}.{1}".format(self.report.replace(" ", "-").replace("/", "-"), self.format.lower())
+		return "{}.{}".format(self.report.replace(" ", "-").replace("/", "-"), self.format.lower())
 
 	def prepare_dynamic_filters(self):
 		self.filters = frappe.parse_json(self.filters)
@@ -204,6 +240,7 @@ class AutoEmailReport(Document):
 
 		frappe.sendmail(
 			recipients=self.email_to.split(),
+			sender=formataddr((self.sender, self.sender_email)) if self.sender else "",
 			subject=self.name,
 			message=message,
 			attachments=attachments,
@@ -260,9 +297,7 @@ def send_daily():
 		try:
 			auto_email_report.send()
 		except Exception as e:
-			auto_email_report.log_error(
-				"Failed to send {0} Auto Email Report".format(auto_email_report.name)
-			)
+			auto_email_report.log_error(f"Failed to send {auto_email_report.name} Auto Email Report")
 
 
 def send_monthly():

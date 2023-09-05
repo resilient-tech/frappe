@@ -10,13 +10,14 @@
 # 3. call update_nsm(doc_obj) in the on_upate method
 
 # ------------------------------------------
-from typing import Iterator
+from collections.abc import Iterator
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.query_builder import DocType, Order
+from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Max
+from frappe.query_builder.terms import SubQuery
 from frappe.query_builder.utils import DocType
 
 
@@ -220,9 +221,7 @@ def rebuild_node(doctype, parent, left, parent_field):
 
 	# we've got the left value, and now that we've processed
 	# the children of this node we also know the right value
-	frappe.db.set_value(
-		doctype, parent, {"lft": left, "rgt": right}, for_update=False, update_modified=False
-	)
+	frappe.db.set_value(doctype, parent, {"lft": left, "rgt": right}, update_modified=False)
 
 	# return the right value of this node + 1
 	return right + 1
@@ -233,7 +232,32 @@ def validate_loop(doctype, name, lft, rgt):
 	if name in frappe.get_all(
 		doctype, filters={"lft": ["<=", lft], "rgt": [">=", rgt]}, pluck="name"
 	):
-		frappe.throw(_("Item cannot be added to its own descendents"), NestedSetRecursionError)
+		frappe.throw(_("Item cannot be added to its own descendants"), NestedSetRecursionError)
+
+
+def remove_subtree(doctype: str, name: str, throw=True):
+	"""Remove doc and all its children.
+
+	WARN: This does not run any controller hooks for deletion and deletes them with raw SQL query.
+	"""
+	frappe.has_permission(doctype, ptype="delete", throw=throw)
+
+	# Determine the `lft` and `rgt` of the subtree to be removed.
+	lft, rgt = frappe.db.get_value(doctype, name, ["lft", "rgt"])
+
+	# Delete the subtree by removing all nodes whose values for `lft` and `rgt`
+	# lie within above values or match them.
+	frappe.db.delete(doctype, {"lft": (">=", lft), "rgt": ("<=", rgt)})
+
+	# The width of the subtree is calculated as the difference between `rgt` and
+	# `lft` plus 1.
+	width = rgt - lft + 1
+
+	# All `lft` and `rgt` values, that are greater than the `rgt` of the removed
+	# subtree, must be reduced by the width of the subtree.
+	table = frappe.qb.DocType(doctype)
+	frappe.qb.update(table).set(table.lft, table.lft - width).where(table.lft > rgt).run()
+	frappe.qb.update(table).set(table.rgt, table.rgt - width).where(table.rgt > rgt).run()
 
 
 class NestedSet(Document):
@@ -246,11 +270,17 @@ class NestedSet(Document):
 		self.validate_ledger()
 
 	def on_trash(self, allow_root_deletion=False):
+		"""
+		Runs on deletion of a document/node
+
+		:param allow_root_deletion: used for allowing root document deletion (DEPRECATED)
+		"""
+
 		if not getattr(self, "nsm_parent_field", None):
 			self.nsm_parent_field = frappe.scrub(self.doctype) + "_parent"
 
 		parent = self.get(self.nsm_parent_field)
-		if not parent and not allow_root_deletion:
+		if not parent and not getattr(self, "allow_root_deletion", True):
 			frappe.throw(_("Root {0} cannot be deleted").format(_(self.doctype)))
 
 		# cannot delete non-empty group
@@ -294,7 +324,6 @@ class NestedSet(Document):
 			{"old_parent": newdn},
 			{parent_field: newdn},
 			update_modified=False,
-			for_update=False,
 		)
 
 		if merge:
@@ -336,14 +365,15 @@ class NestedSet(Document):
 def get_root_of(doctype):
 	"""Get root element of a DocType with a tree structure"""
 	from frappe.query_builder.functions import Count
-	from frappe.query_builder.terms import subqry
 
 	Table = DocType(doctype)
 	t1 = Table.as_("t1")
 	t2 = Table.as_("t2")
 
-	subq = frappe.qb.from_(t2).select(Count("*")).where((t2.lft < t1.lft) & (t2.rgt > t1.rgt))
-	result = frappe.qb.from_(t1).select(t1.name).where((subqry(subq) == 0) & (t1.rgt > t1.lft)).run()
+	node_query = SubQuery(
+		frappe.qb.from_(t2).select(Count("*")).where((t2.lft < t1.lft) & (t2.rgt > t1.rgt))
+	)
+	result = frappe.qb.from_(t1).select(t1.name).where((node_query == 0) & (t1.rgt > t1.lft)).run()
 
 	return result[0][0] if result else None
 

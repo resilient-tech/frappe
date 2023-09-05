@@ -5,28 +5,55 @@ import io
 import os
 import re
 
-from werkzeug.routing import Map, NotFound, Rule
+from werkzeug.exceptions import NotFound
+from werkzeug.routing import Map, Rule
 
 import frappe
-from frappe.website.utils import extract_title
+from frappe.website.utils import extract_title, get_frontmatter
 
 
 def get_page_info_from_web_page_with_dynamic_routes(path):
 	"""
 	Query Web Page with dynamic_route = 1 and evaluate if any of the routes match
 	"""
+	from frappe.website.doctype.web_page.web_page import get_dynamic_web_pages
+
 	rules, page_info = [], {}
 
-	# build rules from all web page with `dynamic_route = 1`
-	for d in frappe.get_all(
-		"Web Page", fields=["name", "route", "modified"], filters=dict(published=1, dynamic_route=1)
-	):
-		rules.append(Rule("/" + d.route, endpoint=d.name))
-		d.doctype = "Web Page"
+	for d in get_dynamic_web_pages():
+		rules.append(Rule(f"/{d.route}", endpoint=d.name))
+		d.doctype = d.doctype or "Web Page"
 		page_info[d.name] = d
 
 	end_point = evaluate_dynamic_routes(rules, path)
 	if end_point:
+		return page_info[end_point]
+
+
+def get_page_info_from_web_form(path):
+	"""Query published web forms and evaluate if the route matches"""
+	from frappe.website.doctype.web_form.web_form import get_published_web_forms
+
+	rules, page_info = [], {}
+	for d in get_published_web_forms():
+		rules.append(Rule(f"/{d.route}", endpoint=d.name))
+		rules.append(Rule(f"/{d.route}/list", endpoint=d.name))
+		rules.append(Rule(f"/{d.route}/new", endpoint=d.name))
+		rules.append(Rule(f"/{d.route}/<name>", endpoint=d.name))
+		rules.append(Rule(f"/{d.route}/<name>/edit", endpoint=d.name))
+		d.doctype = "Web Form"
+		page_info[d.name] = d
+
+	end_point = evaluate_dynamic_routes(rules, path)
+	if end_point:
+		if path.endswith("/list"):
+			frappe.form_dict.is_list = True
+		elif path.endswith("/new"):
+			frappe.form_dict.is_new = True
+		elif path.endswith("/edit"):
+			frappe.form_dict.is_edit = True
+		else:
+			frappe.form_dict.is_read = True
 		return page_info[end_point]
 
 
@@ -73,7 +100,7 @@ def get_pages(app=None):
 
 		return pages
 
-	return frappe.cache().get_value("website_pages", lambda: _build(app))
+	return frappe.cache.get_value("website_pages", lambda: _build(app))
 
 
 def get_pages_from_path(start, app, app_path):
@@ -82,7 +109,7 @@ def get_pages_from_path(start, app, app_path):
 	if os.path.exists(start_path):
 		for basepath, folders, files in os.walk(start_path):
 			# add missing __init__.py
-			if not "__init__.py" in files:
+			if not "__init__.py" in files and frappe.conf.get("developer_mode"):
 				open(os.path.join(basepath, "__init__.py"), "a").close()
 
 			for fname in files:
@@ -161,26 +188,6 @@ def get_page_info(path, app, start, basepath=None, app_path=None, fname=None):
 	return page_info
 
 
-def get_frontmatter(string):
-	"""
-	Reference: https://github.com/jonbeebe/frontmatter
-	"""
-	import yaml
-
-	fmatter = ""
-	body = ""
-	result = re.compile(r"^\s*(?:---|\+\+\+)(.*?)(?:---|\+\+\+)\s*(.+)$", re.S | re.M).search(string)
-
-	if result:
-		fmatter = result.group(1)
-		body = result.group(2)
-
-	return {
-		"attributes": yaml.safe_load(fmatter),
-		"body": body,
-	}
-
-
 def setup_source(page_info):
 	"""Get the HTML source of the template"""
 	jenv = frappe.get_jenv()
@@ -224,13 +231,13 @@ def setup_source(page_info):
 	# load css/js files
 	js_path = os.path.join(page_info.basepath, (page_info.basename or "index") + ".js")
 	if os.path.exists(js_path) and "{% block script %}" not in html:
-		with io.open(js_path, "r", encoding="utf-8") as f:
+		with open(js_path, encoding="utf-8") as f:
 			js = f.read()
 			page_info.colocated_js = js
 
 	css_path = os.path.join(page_info.basepath, (page_info.basename or "index") + ".css")
 	if os.path.exists(css_path) and "{% block style %}" not in html:
-		with io.open(css_path, "r", encoding="utf-8") as f:
+		with open(css_path, encoding="utf-8") as f:
 			css = f.read()
 			page_info.colocated_css = css
 
@@ -259,8 +266,7 @@ def get_base_template(path=None):
 	for pattern in patterns_desc:
 		if re.match(pattern, path):
 			templates = base_template_map[pattern]
-			base_template = templates[-1]
-			return base_template
+			return templates[-1]
 
 
 def setup_index(page_info):
@@ -269,7 +275,7 @@ def setup_index(page_info):
 		# load index.txt if loading all pages
 		index_txt_path = os.path.join(page_info.basepath, "index.txt")
 		if os.path.exists(index_txt_path):
-			with open(index_txt_path, "r") as f:
+			with open(index_txt_path) as f:
 				page_info.index = f.read().splitlines()
 
 
@@ -303,8 +309,18 @@ def get_doctypes_with_web_view():
 		]
 		return doctypes
 
-	return frappe.cache().get_value("doctypes_with_web_view", _get)
+	return frappe.cache.get_value("doctypes_with_web_view", _get)
 
 
 def get_start_folders():
 	return frappe.local.flags.web_pages_folders or ("www", "templates/pages")
+
+
+def clear_routing_cache():
+	from frappe.website.doctype.web_form.web_form import get_published_web_forms
+	from frappe.website.doctype.web_page.web_page import get_dynamic_web_pages
+	from frappe.website.page_renderers.document_page import _find_matching_document_webview
+
+	_find_matching_document_webview.clear_cache()
+	get_dynamic_web_pages.clear_cache()
+	get_published_web_forms.clear_cache()

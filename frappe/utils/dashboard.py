@@ -7,7 +7,7 @@ from os.path import join
 import frappe
 from frappe import _
 from frappe.modules.import_file import import_file_by_path
-from frappe.utils import add_to_date, cint, get_link_to_form
+from frappe.utils import cint, get_link_to_form
 
 
 def cache_source(function):
@@ -21,11 +21,11 @@ def cache_source(function):
 		if no_cache:
 			return function(chart=chart, no_cache=no_cache)
 		chart_name = frappe.parse_json(chart).name
-		cache_key = "chart-data:{}".format(chart_name)
+		cache_key = f"chart-data:{chart_name}"
 		if int(kwargs.get("refresh") or 0):
 			results = generate_and_cache_results(kwargs, function, cache_key, chart)
 		else:
-			cached_results = frappe.cache().get_value(cache_key)
+			cached_results = frappe.cache.get_value(cache_key)
 			if cached_results:
 				results = frappe.parse_json(frappe.safe_decode(cached_results))
 			else:
@@ -64,9 +64,10 @@ def generate_and_cache_results(args, function, cache_key, chart):
 		else:
 			raise
 
-	frappe.db.set_value(
-		"Dashboard Chart", args.chart_name, "last_synced_on", frappe.utils.now(), update_modified=False
-	)
+	if not frappe.flags.read_only:
+		frappe.db.set_value(
+			"Dashboard Chart", args.chart_name, "last_synced_on", frappe.utils.now(), update_modified=False
+		)
 	return results
 
 
@@ -79,21 +80,15 @@ def get_dashboards_with_link(docname, doctype):
 	elif doctype == "Number Card":
 		links = frappe.get_all("Number Card Link", fields=["parent"], filters={"card": docname})
 
-	dashboards = [link.parent for link in links]
-	return dashboards
+	return [link.parent for link in links]
 
 
 def sync_dashboards(app=None):
-	"""Import, overwrite fixtures from `[app]/fixtures`"""
-	if not cint(frappe.db.get_single_value("System Settings", "setup_complete")):
-		return
-	if app:
-		apps = [app]
-	else:
-		apps = frappe.get_installed_apps()
+	"""Import, overwrite dashboards from `[app]/[app]_dashboard`"""
+	apps = [app] if app else frappe.get_installed_apps()
 
 	for app_name in apps:
-		print("Updating Dashboard for {app}".format(app=app_name))
+		print(f"Updating Dashboard for {app_name}")
 		for module_name in frappe.local.app_modules.get(app_name) or []:
 			frappe.flags.in_import = True
 			make_records_in_module(app_name, module_name)
@@ -101,7 +96,7 @@ def sync_dashboards(app=None):
 
 
 def make_records_in_module(app, module):
-	dashboards_path = frappe.get_module_path(module, "{module}_dashboard".format(module=module))
+	dashboards_path = frappe.get_module_path(module, f"{module}_dashboard")
 	charts_path = frappe.get_module_path(module, "dashboard chart")
 	cards_path = frappe.get_module_path(module, "number card")
 

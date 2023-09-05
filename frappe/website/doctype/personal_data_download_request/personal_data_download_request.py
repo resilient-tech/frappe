@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -11,6 +10,18 @@ from frappe.utils.verified_command import get_signed_params
 
 
 class PersonalDataDownloadRequest(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		amended_from: DF.Link | None
+		user: DF.Link
+		user_name: DF.Data | None
+	# end: auto-generated types
 	def after_insert(self):
 		personal_data = get_user_data(self.user)
 

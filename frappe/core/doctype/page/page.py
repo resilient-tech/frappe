@@ -14,6 +14,24 @@ from frappe.model.utils import render_include
 
 
 class Page(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.core.doctype.has_role.has_role import HasRole
+		from frappe.types import DF
+
+		icon: DF.Data | None
+		module: DF.Link
+		page_name: DF.Data
+		restrict_to_domain: DF.Link | None
+		roles: DF.Table[HasRole]
+		standard: DF.Literal["Yes", "No"]
+		system_page: DF.Check
+		title: DF.Data | None
+	# end: auto-generated types
 	def autoname(self):
 		"""
 		Creates a url friendly name for this page.
@@ -79,7 +97,7 @@ class Page(Document):
 					)
 
 	def as_dict(self, no_nulls=False):
-		d = super(Page, self).as_dict(no_nulls=no_nulls)
+		d = super().as_dict(no_nulls=no_nulls)
 		for key in ("script", "style", "content"):
 			d[key] = self.get(key)
 		return d
@@ -120,20 +138,20 @@ class Page(Document):
 		# script
 		fpath = os.path.join(path, page_name + ".js")
 		if os.path.exists(fpath):
-			with open(fpath, "r") as f:
+			with open(fpath) as f:
 				self.script = render_include(f.read())
 				self.script += f"\n\n//# sourceURL={page_name}.js"
 
 		# css
 		fpath = os.path.join(path, page_name + ".css")
 		if os.path.exists(fpath):
-			with open(fpath, "r") as f:
+			with open(fpath) as f:
 				self.style = safe_decode(f.read())
 
 		# html as js template
 		for fname in os.listdir(path):
 			if fname.endswith(".html"):
-				with open(os.path.join(path, fname), "r") as f:
+				with open(os.path.join(path, fname)) as f:
 					template = f.read()
 					if "<!-- jinja -->" in template:
 						context = frappe._dict({})

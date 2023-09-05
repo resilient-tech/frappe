@@ -3,7 +3,7 @@ import datetime
 import hashlib
 import re
 from http import cookies
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import jwt
 import pytz
@@ -11,6 +11,7 @@ from oauthlib.openid import RequestValidator
 
 import frappe
 from frappe.auth import LoginManager
+from frappe.utils.data import get_system_timezone
 
 
 class OAuthWebRequestValidator(RequestValidator):
@@ -42,8 +43,7 @@ class OAuthWebRequestValidator(RequestValidator):
 		# The redirect used if none has been supplied.
 		# Prefer your clients to pre register a redirect uri rather than
 		# supplying one on each authorization request.
-		redirect_uri = frappe.db.get_value("OAuth Client", client_id, "default_redirect_uri")
-		return redirect_uri
+		return frappe.db.get_value("OAuth Client", client_id, "default_redirect_uri")
 
 	def validate_scopes(self, client_id, scopes, client, request, *args, **kwargs):
 		# Is the client allowed to access the requested scopes?
@@ -149,11 +149,7 @@ class OAuthWebRequestValidator(RequestValidator):
 			filters={"client": client_id, "validity": "Valid"},
 		)
 
-		checkcodes = []
-		for vcode in validcodes:
-			checkcodes.append(vcode["name"])
-
-		if code in checkcodes:
+		if code in [vcode["name"] for vcode in validcodes]:
 			request.scopes = frappe.db.get_value("OAuth Authorization Code", code, "scopes").split(
 				get_url_delimiter()
 			)
@@ -230,10 +226,7 @@ class OAuthWebRequestValidator(RequestValidator):
 		otoken.save(ignore_permissions=True)
 		frappe.db.commit()
 
-		default_redirect_uri = frappe.db.get_value(
-			"OAuth Client", request.client["name"], "default_redirect_uri"
-		)
-		return default_redirect_uri
+		return frappe.db.get_value("OAuth Client", request.client["name"], "default_redirect_uri")
 
 	def invalidate_authorization_code(self, client_id, code, request, *args, **kwargs):
 		# Authorization codes are use once, invalidate it when a Bearer token
@@ -248,7 +241,7 @@ class OAuthWebRequestValidator(RequestValidator):
 		# Remember to check expiration and scope membership
 		otoken = frappe.get_doc("OAuth Bearer Token", token)
 		token_expiration_local = otoken.expiration_time.replace(
-			tzinfo=pytz.timezone(frappe.utils.get_time_zone())
+			tzinfo=pytz.timezone(get_system_timezone())
 		)
 		token_expiration_utc = token_expiration_local.astimezone(pytz.utc)
 		is_token_valid = (
@@ -323,15 +316,14 @@ class OAuthWebRequestValidator(RequestValidator):
 		# Check whether frappe server URL is set
 		id_token_header = {"typ": "jwt", "alg": "HS256"}
 
-		user = frappe.get_doc(
-			"User",
-			frappe.session.user,
-		)
+		user = frappe.get_doc("User", request.user)
 
 		if request.nonce:
 			id_token["nonce"] = request.nonce
 
 		userinfo = get_userinfo(user)
+
+		id_token["exp"] = id_token.get("iat") + token.get("expires_in")
 
 		if userinfo.get("iss"):
 			id_token["iss"] = userinfo.get("iss")
@@ -365,6 +357,7 @@ class OAuthWebRequestValidator(RequestValidator):
 
 	def get_jwt_bearer_token(self, token, token_handler, request):
 		now = datetime.datetime.now()
+
 		id_token = dict(
 			aud=token.client_id,
 			iat=round(now.timestamp()),
@@ -374,8 +367,7 @@ class OAuthWebRequestValidator(RequestValidator):
 
 	def get_userinfo_claims(self, request):
 		user = frappe.get_doc("User", frappe.session.user)
-		userinfo = get_userinfo(user)
-		return userinfo
+		return get_userinfo(user)
 
 	def validate_id_token(self, token, scopes, request):
 		try:
@@ -577,9 +569,9 @@ def get_userinfo(user):
 		if frappe.utils.validate_url(user.user_image, valid_schemes=valid_url_schemes):
 			picture = user.user_image
 		else:
-			picture = frappe_server_url + "/" + user.user_image
+			picture = urljoin(frappe_server_url, user.user_image)
 
-	userinfo = frappe._dict(
+	return frappe._dict(
 		{
 			"sub": frappe.db.get_value(
 				"User Social Login",
@@ -595,8 +587,6 @@ def get_userinfo(user):
 			"iss": frappe_server_url,
 		}
 	)
-
-	return userinfo
 
 
 def get_url_delimiter(separator_character=" "):

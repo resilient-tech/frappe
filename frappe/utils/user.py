@@ -2,14 +2,14 @@
 # License: MIT. See LICENSE
 
 from email.utils import formataddr
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 import frappe
 import frappe.share
 from frappe import _dict
 from frappe.boot import get_allowed_reports
 from frappe.core.doctype.domain_settings.domain_settings import get_active_modules
-from frappe.permissions import get_roles, get_valid_perms
+from frappe.permissions import AUTOMATIC_ROLES, get_roles, get_valid_perms
 from frappe.query_builder import DocType, Order
 from frappe.query_builder.functions import Concat_ws
 
@@ -40,7 +40,6 @@ class UserPermissions:
 		self.can_export = []
 		self.can_print = []
 		self.can_email = []
-		self.can_set_user_permissions = []
 		self.allow_modules = []
 		self.in_create = []
 		self.setup_user()
@@ -60,7 +59,7 @@ class UserPermissions:
 			return user
 
 		if not frappe.flags.in_install_db and not frappe.flags.in_test:
-			user_doc = frappe.cache().hget("user_doc", self.name, get_user_doc)
+			user_doc = frappe.cache.hget("user_doc", self.name, get_user_doc)
 			if user_doc:
 				self.doc = frappe.get_doc(user_doc)
 
@@ -152,7 +151,7 @@ class UserPermissions:
 			if p.get("read") or p.get("write") or p.get("create"):
 				if p.get("report"):
 					self.can_get_report.append(dt)
-				for key in ("import", "export", "print", "email", "set_user_permissions"):
+				for key in ("import", "export", "print", "email"):
 					if p.get(key):
 						getattr(self, "can_" + key).append(dt)
 
@@ -187,7 +186,7 @@ class UserPermissions:
 				filters={"property": "allow_import", "value": "1"},
 			)
 
-		frappe.cache().hset("can_import", frappe.session.user, self.can_import)
+		frappe.cache.hset("can_import", frappe.session.user, self.can_import)
 
 	def get_defaults(self):
 		import frappe.defaults
@@ -222,6 +221,7 @@ class UserPermissions:
 				"mute_sounds",
 				"send_me_a_copy",
 				"user_type",
+				"onboarding_status",
 			],
 			as_dict=True,
 		)
@@ -230,6 +230,7 @@ class UserPermissions:
 			self.build_permissions()
 
 		d.name = self.name
+		d.onboarding_status = frappe.parse_json(d.onboarding_status)
 		d.roles = self.get_roles()
 		d.defaults = self.get_defaults()
 		for key in (
@@ -248,7 +249,6 @@ class UserPermissions:
 			"can_import",
 			"can_print",
 			"can_email",
-			"can_set_user_permissions",
 		):
 			d[key] = list(set(getattr(self, key)))
 
@@ -273,7 +273,7 @@ def get_user_fullname(user: str) -> str:
 
 def get_fullname_and_avatar(user: str) -> _dict:
 	first_name, last_name, avatar, name = frappe.db.get_value(
-		"User", user, ["first_name", "last_name", "user_image", "name"]
+		"User", user, ["first_name", "last_name", "user_image", "name"], order_by=None
 	)
 	return _dict(
 		{
@@ -284,7 +284,7 @@ def get_fullname_and_avatar(user: str) -> _dict:
 	)
 
 
-def get_system_managers(only_name: bool = False) -> List[str]:
+def get_system_managers(only_name: bool = False) -> list[str]:
 	"""returns all system manager's user details"""
 	HasRole = DocType("Has Role")
 	User = DocType("User")
@@ -297,7 +297,7 @@ def get_system_managers(only_name: bool = False) -> List[str]:
 	system_managers = (
 		frappe.qb.from_(User)
 		.join(HasRole)
-		.on((HasRole.parent == User.name))
+		.on(HasRole.parent == User.name)
 		.where(
 			(HasRole.parenttype == "User")
 			& (User.enabled == 1)
@@ -322,8 +322,8 @@ def add_role(user: str, role: str) -> None:
 
 def add_system_manager(
 	email: str,
-	first_name: Optional[str] = None,
-	last_name: Optional[str] = None,
+	first_name: str | None = None,
+	last_name: str | None = None,
 	send_welcome_email: bool = False,
 	password: str = None,
 ) -> "User":
@@ -347,7 +347,7 @@ def add_system_manager(
 	roles = frappe.get_all(
 		"Role",
 		fields=["name"],
-		filters={"name": ["not in", ("Administrator", "Guest", "All")]},
+		filters={"name": ["not in", AUTOMATIC_ROLES]},
 	)
 	roles = [role.name for role in roles]
 	user.add_roles(*roles)
@@ -359,7 +359,7 @@ def add_system_manager(
 	return user
 
 
-def get_enabled_system_users() -> List[Dict]:
+def get_enabled_system_users() -> list[dict]:
 	return frappe.get_all(
 		"User",
 		fields=["email", "language", "name"],
@@ -371,11 +371,13 @@ def get_enabled_system_users() -> List[Dict]:
 	)
 
 
-def is_website_user(username: Optional[str] = None) -> Optional[str]:
+def is_website_user(username: str | None = None) -> str | None:
 	return frappe.db.get_value("User", username or frappe.session.user, "user_type") == "Website User"
 
 
-def is_system_user(username: Optional[str] = None) -> Optional[str]:
+def is_system_user(username: str | None = None) -> str | None:
+	# TODO: Depracate this. Inefficient, incorrect. This function is meant to be used in emails only.
+	# Problem: Filters on email instead of PK, implicitly filters out disabled users.
 	return frappe.db.get_value(
 		"User",
 		{
@@ -383,28 +385,26 @@ def is_system_user(username: Optional[str] = None) -> Optional[str]:
 			"enabled": 1,
 			"user_type": "System User",
 		},
+		cache=True,
 	)
 
 
-def get_users() -> List[Dict]:
+def get_users() -> list[dict]:
 	from frappe.core.doctype.user.user import get_system_users
 
-	users = []
 	system_managers = get_system_managers(only_name=True)
 
-	for user in get_system_users():
-		users.append(
-			{
-				"full_name": get_user_fullname(user),
-				"email": user,
-				"is_system_manager": user in system_managers,
-			}
-		)
-
-	return users
+	return [
+		{
+			"full_name": get_user_fullname(user),
+			"email": user,
+			"is_system_manager": user in system_managers,
+		}
+		for user in get_system_users()
+	]
 
 
-def get_users_with_role(role: str) -> List[str]:
+def get_users_with_role(role: str) -> list[str]:
 	User = DocType("User")
 	HasRole = DocType("Has Role")
 

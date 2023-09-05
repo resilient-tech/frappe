@@ -2,7 +2,8 @@
 # License: MIT. See LICENSE
 
 import json
-from typing import TYPE_CHECKING, Dict
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 import frappe
 import frappe.email.smtp
@@ -12,6 +13,8 @@ from frappe.utils import (
 	cint,
 	get_datetime,
 	get_formatted_email,
+	get_imaginary_pixel_response,
+	get_string_between,
 	list_to_str,
 	split_emails,
 	validate_email_address,
@@ -19,14 +22,6 @@ from frappe.utils import (
 
 if TYPE_CHECKING:
 	from frappe.core.doctype.communication.communication import Communication
-
-
-OUTGOING_EMAIL_ACCOUNT_MISSING = _(
-	"""
-	Unable to send mail because of a missing email account.
-	Please setup default Email Account from Setup > Email > Email Account
-"""
-)
 
 
 @frappe.whitelist()
@@ -43,7 +38,7 @@ def make(
 	send_email=False,
 	print_html=None,
 	print_format=None,
-	attachments="[]",
+	attachments=None,
 	send_me_a_copy=False,
 	cc=None,
 	bcc=None,
@@ -52,7 +47,7 @@ def make(
 	email_template=None,
 	communication_type=None,
 	**kwargs,
-) -> Dict[str, str]:
+) -> dict[str, str]:
 	"""Make a new communication. Checks for email permissions for specified Document.
 
 	:param doctype: Reference DocType.
@@ -66,7 +61,7 @@ def make(
 	:param send_email: Send via email (default **False**).
 	:param print_html: HTML Print format to be sent as attachment.
 	:param print_format: Print Format name of parent document to be sent as attachment.
-	:param attachments: List of attachments as list of files or JSON string.
+	:param attachments: List of File names or dicts with keys "fname" and "fcontent"
 	:param send_me_a_copy: Send a copy to the sender (default **False**).
 	:param email_template: Template which is used to compose mail .
 	"""
@@ -99,7 +94,7 @@ def make(
 		send_me_a_copy=cint(send_me_a_copy),
 		cc=cc,
 		bcc=bcc,
-		read_receipt=read_receipt,
+		read_receipt=cint(read_receipt),
 		print_letterhead=print_letterhead,
 		email_template=email_template,
 		communication_type=communication_type,
@@ -120,7 +115,7 @@ def _make(
 	send_email=False,
 	print_html=None,
 	print_format=None,
-	attachments="[]",
+	attachments=None,
 	send_me_a_copy=False,
 	cc=None,
 	bcc=None,
@@ -129,7 +124,7 @@ def _make(
 	email_template=None,
 	communication_type=None,
 	add_signature=True,
-) -> Dict[str, str]:
+) -> dict[str, str]:
 	"""Internal method to make a new communication that ignores Permission checks."""
 
 	sender = sender or get_formatted_email(frappe.session.user)
@@ -152,7 +147,7 @@ def _make(
 			"reference_doctype": doctype,
 			"reference_name": name,
 			"email_template": email_template,
-			"message_id": get_message_id().strip(" <>"),
+			"message_id": get_string_between("<", get_message_id(), ">"),
 			"read_receipt": read_receipt,
 			"has_attachment": 1 if attachments else 0,
 			"communication_type": communication_type,
@@ -169,7 +164,12 @@ def _make(
 
 	if cint(send_email):
 		if not comm.get_outgoing_email_account():
-			frappe.throw(msg=OUTGOING_EMAIL_ACCOUNT_MISSING, exc=frappe.OutgoingEmailError)
+			frappe.throw(
+				_(
+					"Unable to send mail because of a missing email account. Please setup default Email Account from Settings > Email Account"
+				),
+				exc=frappe.OutgoingEmailError,
+			)
 
 		comm.send_email(
 			print_html=print_html,
@@ -219,26 +219,41 @@ def set_incoming_outgoing_accounts(doc):
 		doc.db_set("email_account", doc.outgoing_email_account.name)
 
 
-def add_attachments(name, attachments):
-	"""Add attachments to the given Communication"""
+def add_attachments(name: str, attachments: Iterable[str | dict]) -> None:
+	"""Add attachments to the given Communication
+
+	:param name: Communication name
+	:param attachments: File names or dicts with keys "fname" and "fcontent"
+	"""
 	# loop through attachments
 	for a in attachments:
 		if isinstance(a, str):
-			attach = frappe.db.get_value(
-				"File", {"name": a}, ["file_name", "file_url", "is_private"], as_dict=1
-			)
-			# save attachments to new doc
-			_file = frappe.get_doc(
-				{
-					"doctype": "File",
-					"file_url": attach.file_url,
-					"attached_to_doctype": "Communication",
-					"attached_to_name": name,
-					"folder": "Home/Attachments",
-					"is_private": attach.is_private,
-				}
-			)
-			_file.save(ignore_permissions=True)
+			attach = frappe.db.get_value("File", {"name": a}, ["file_url", "is_private"], as_dict=1)
+			file_args = {
+				"file_url": attach.file_url,
+				"is_private": attach.is_private,
+			}
+		elif isinstance(a, dict) and "fcontent" in a and "fname" in a:
+			# dict returned by frappe.attach_print()
+			file_args = {
+				"file_name": a["fname"],
+				"content": a["fcontent"],
+				"is_private": 1,
+			}
+		else:
+			continue
+
+		file_args.update(
+			{
+				"attached_to_doctype": "Communication",
+				"attached_to_name": name,
+				"folder": "Home/Attachments",
+			}
+		)
+
+		_file = frappe.new_doc("File")
+		_file.update(file_args)
+		_file.save(ignore_permissions=True)
 
 
 @frappe.whitelist(allow_guest=True, methods=("GET",))
@@ -251,18 +266,7 @@ def mark_email_as_seen(name: str = None):
 		frappe.log_error("Unable to mark as seen", None, "Communication", name)
 
 	finally:
-		frappe.response.update(
-			{
-				"type": "binary",
-				"filename": "imaginary_pixel.png",
-				"filecontent": (
-					b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00"
-					b"\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\r"
-					b"IDATx\x9cc\xf8\xff\xff?\x03\x00\x08\xfc\x02\xfe\xa7\x9a\xa0"
-					b"\xa0\x00\x00\x00\x00IEND\xaeB`\x82"
-				),
-			}
-		)
+		frappe.response.update(frappe.utils.get_imaginary_pixel_response())
 
 
 def update_communication_as_read(name):

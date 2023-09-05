@@ -1,7 +1,7 @@
 # Copyright (c) 2022, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
-from typing import Dict, Iterable, List
+from collections.abc import Iterable
 
 import frappe
 from frappe import _
@@ -12,6 +12,32 @@ from frappe.model.document import Document
 
 
 class AssignmentRule(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.automation.doctype.assignment_rule_day.assignment_rule_day import AssignmentRuleDay
+		from frappe.automation.doctype.assignment_rule_user.assignment_rule_user import (
+			AssignmentRuleUser,
+		)
+		from frappe.types import DF
+
+		assign_condition: DF.Code
+		assignment_days: DF.Table[AssignmentRuleDay]
+		close_condition: DF.Code | None
+		description: DF.SmallText
+		disabled: DF.Check
+		document_type: DF.Link
+		due_date_based_on: DF.Literal
+		field: DF.Literal
+		last_user: DF.Link | None
+		priority: DF.Int
+		rule: DF.Literal["Round Robin", "Load Balancing", "Based on Field"]
+		unassign_condition: DF.Code | None
+		users: DF.TableMultiSelect[AssignmentRuleUser]
+	# end: auto-generated types
 	def validate(self):
 		self.validate_document_types()
 		self.validate_assignment_days()
@@ -115,17 +141,20 @@ class AssignmentRule(Document):
 
 	def get_user_load_balancing(self):
 		"""Assign to the user with least number of open assignments"""
-		counts = []
-		for d in self.users:
-			counts.append(
-				dict(
-					user=d.user,
-					count=frappe.db.count(
-						"ToDo", dict(reference_type=self.document_type, allocated_to=d.user, status="Open")
+		counts = [
+			dict(
+				user=d.user,
+				count=frappe.db.count(
+					"ToDo",
+					dict(
+						reference_type=self.document_type,
+						allocated_to=d.user,
+						status="Open",
 					),
-				)
+				),
 			)
-
+			for d in self.users
+		]
 		# sort by dict value
 		sorted_counts = sorted(counts, key=lambda k: k["count"])
 
@@ -157,7 +186,7 @@ class AssignmentRule(Document):
 		return assignment_days and today not in assignment_days
 
 
-def get_assignments(doc) -> List[Dict]:
+def get_assignments(doc) -> list[dict]:
 	return frappe.get_all(
 		"ToDo",
 		fields=["name", "assignment_rule"],
@@ -228,7 +257,7 @@ def apply(doc=None, method=None, doctype=None, name=None):
 	)
 
 	# multiple auto assigns
-	assignment_rule_docs: List[AssignmentRule] = [
+	assignment_rule_docs: list[AssignmentRule] = [
 		frappe.get_cached_doc("Assignment Rule", d.get("name")) for d in assignment_rules
 	]
 
@@ -298,8 +327,6 @@ def apply(doc=None, method=None, doctype=None, name=None):
 					if reopened:
 						break
 
-				# print(f"Rule:{assignment_rule}\nDoc: {doc}\nReOpened: {reopened}")
-
 			assignment_rule.close_assignments(doc)
 
 
@@ -358,11 +385,11 @@ def update_due_date(doc, state=None):
 				todo_doc.save(ignore_permissions=True)
 
 
-def get_assignment_rules() -> List[str]:
+def get_assignment_rules() -> list[str]:
 	return frappe.get_all("Assignment Rule", filters={"disabled": 0}, pluck="document_type")
 
 
-def get_repeated(values: Iterable) -> List:
+def get_repeated(values: Iterable) -> list:
 	unique = set()
 	repeated = set()
 

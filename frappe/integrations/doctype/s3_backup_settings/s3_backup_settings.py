@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2017, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 import os
@@ -22,6 +21,24 @@ from frappe.utils.background_jobs import enqueue
 
 
 class S3BackupSettings(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		access_key_id: DF.Data
+		backup_files: DF.Check
+		bucket: DF.Data
+		enabled: DF.Check
+		endpoint_url: DF.Data | None
+		frequency: DF.Literal["Daily", "Weekly", "Monthly", "None"]
+		notify_email: DF.Data
+		secret_access_key: DF.Password
+		send_email_for_successful_backup: DF.Check
+	# end: auto-generated types
 	def validate(self):
 		if not self.enabled:
 			return
@@ -77,8 +94,8 @@ def take_backups_monthly():
 
 
 def take_backups_if(freq):
-	if cint(frappe.db.get_value("S3 Backup Settings", None, "enabled")):
-		if frappe.db.get_value("S3 Backup Settings", None, "frequency") == freq:
+	if cint(frappe.db.get_single_value("S3 Backup Settings", "enabled")):
+		if frappe.db.get_single_value("S3 Backup Settings", "frequency") == freq:
 			take_backups_s3()
 
 

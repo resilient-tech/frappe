@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2019, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -15,6 +14,22 @@ from frappe.utils.verified_command import get_signed_params, verify_request
 
 
 class PersonalDataDeletionRequest(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+		from frappe.website.doctype.personal_data_deletion_step.personal_data_deletion_step import (
+			PersonalDataDeletionStep,
+		)
+
+		anonymization_matrix: DF.Code | None
+		deletion_steps: DF.Table[PersonalDataDeletionStep]
+		email: DF.Data
+		status: DF.Literal["Pending Verification", "Pending Approval", "On Hold", "Deleted"]
+	# end: auto-generated types
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 
@@ -129,7 +144,6 @@ class PersonalDataDeletionRequest(Document):
 				"host_name": frappe.utils.get_url(),
 			},
 			header=[_("Your account has been deleted"), "green"],
-			now=True,
 		)
 
 	def add_deletion_steps(self):
@@ -392,4 +406,4 @@ def confirm_deletion(email, name, host_name):
 
 
 def get_pattern(full_match):
-	return re.compile(r"(?<!\.)\b{0}\b(?!\.)".format(re.escape(full_match)))
+	return re.compile(rf"(?<!\.)\b{re.escape(full_match)}\b(?!\.)")

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2021, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 
@@ -9,6 +8,21 @@ from frappe.utils import nowdate
 
 
 class SMSSettings(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.core.doctype.sms_parameter.sms_parameter import SMSParameter
+		from frappe.types import DF
+
+		message_parameter: DF.Data
+		parameters: DF.Table[SMSParameter]
+		receiver_parameter: DF.Data
+		sms_gateway_url: DF.SmallText
+		use_post: DF.Check
+	# end: auto-generated types
 	pass
 
 
@@ -64,7 +78,7 @@ def send_sms(receiver_list, msg, sender_name="", success_msg=True):
 		"success_msg": success_msg,
 	}
 
-	if frappe.db.get_value("SMS Settings", None, "sms_gateway_url"):
+	if frappe.db.get_single_value("SMS Settings", "sms_gateway_url"):
 		send_via_gateway(arg)
 	else:
 		msgprint(_("Please Update SMS Settings"))

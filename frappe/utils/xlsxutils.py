@@ -40,7 +40,7 @@ def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 
 			if isinstance(item, str) and next(ILLEGAL_CHARACTERS_RE.finditer(value), None):
 				# Remove illegal characters from the string
-				value = re.sub(ILLEGAL_CHARACTERS_RE, "", value)
+				value = ILLEGAL_CHARACTERS_RE.sub("", value)
 
 			clean_row.append(value)
 
@@ -52,7 +52,7 @@ def make_xlsx(data, sheet_name, wb=None, column_widths=None):
 
 
 def handle_html(data):
-	from html2text import HTML2Text
+	from frappe.core.utils import html2text
 
 	# return if no html tags found
 	data = frappe.as_unicode(data)
@@ -62,21 +62,15 @@ def handle_html(data):
 
 	h = unescape_html(data or "")
 
-	obj = HTML2Text()
-	obj.ignore_links = True
-	obj.body_width = 0
-
 	try:
-		value = obj.handle(h)
+		value = html2text(h, strip_links=True, wrap=False)
 	except Exception:
 		# unable to parse html, send it raw
 		return data
 
 	value = ", ".join(value.split("  \n"))
 	value = " ".join(value.split("\n"))
-	value = ", ".join(value.split("# "))
-
-	return value
+	return ", ".join(value.split("# "))
 
 
 def read_xlsx_file_from_attached_file(file_url=None, fcontent=None, filepath=None):
@@ -94,10 +88,7 @@ def read_xlsx_file_from_attached_file(file_url=None, fcontent=None, filepath=Non
 	wb1 = load_workbook(filename=filename, read_only=True, data_only=True)
 	ws1 = wb1.active
 	for row in ws1.iter_rows():
-		tmp_list = []
-		for cell in row:
-			tmp_list.append(cell.value)
-		rows.append(tmp_list)
+		rows.append([cell.value for cell in row])
 	return rows
 
 
@@ -105,15 +96,10 @@ def read_xls_file_from_attached_file(content):
 	book = xlrd.open_workbook(file_contents=content)
 	sheets = book.sheets()
 	sheet = sheets[0]
-	rows = []
-	for i in range(sheet.nrows):
-		rows.append(sheet.row_values(i))
-	return rows
+	return [sheet.row_values(i) for i in range(sheet.nrows)]
 
 
 def build_xlsx_response(data, filename):
-	xlsx_file = make_xlsx(data, filename)
-	# write out response as a xlsx type
-	frappe.response["filename"] = filename + ".xlsx"
-	frappe.response["filecontent"] = xlsx_file.getvalue()
-	frappe.response["type"] = "binary"
+	from frappe.desk.utils import provide_binary_file
+
+	provide_binary_file(filename, "xlsx", make_xlsx(data, filename).getvalue())

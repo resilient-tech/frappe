@@ -1,6 +1,7 @@
 @import '../common/quill';
 @import 'variables';
 @import '~bootstrap/scss/bootstrap';
+@import '~cropperjs/dist/cropper.min';
 @import "../common/mixins";
 @import "../common/global";
 @import "../common/icons";
@@ -125,6 +126,10 @@
 	align-items: center;
 }
 
+.page_content {
+	min-height: 50vh;
+}
+
 .breadcrumb-container {
 	margin-top: 1rem;
 	padding-top:  0.25rem;
@@ -191,6 +196,7 @@ a.card {
 
 h4.modal-title {
 	font-size: 1em;
+	margin: 0px !important;
 }
 
 h5.modal-title {

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2017, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -13,8 +12,44 @@ from frappe.utils.weasyprint import download_pdf, get_html
 
 
 class PrintFormat(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.types import DF
+
+		absolute_value: DF.Check
+		align_labels_right: DF.Check
+		css: DF.Code | None
+		custom_format: DF.Check
+		default_print_language: DF.Link | None
+		disabled: DF.Check
+		doc_type: DF.Link
+		font: DF.Data | None
+		font_size: DF.Int
+		format_data: DF.Code | None
+		html: DF.Code | None
+		line_breaks: DF.Check
+		margin_bottom: DF.Float
+		margin_left: DF.Float
+		margin_right: DF.Float
+		margin_top: DF.Float
+		module: DF.Link | None
+		page_number: DF.Literal[
+			"Hide", "Top Left", "Top Center", "Top Right", "Bottom Left", "Bottom Center", "Bottom Right"
+		]
+		print_format_builder: DF.Check
+		print_format_builder_beta: DF.Check
+		print_format_type: DF.Literal["Jinja", "JS"]
+		raw_commands: DF.Code | None
+		raw_printing: DF.Check
+		show_section_headings: DF.Check
+		standard: DF.Literal["No", "Yes"]
+	# end: auto-generated types
 	def onload(self):
-		templates = frappe.db.get_all(
+		templates = frappe.get_all(
 			"Print Format Field Template",
 			fields=["template", "field", "name"],
 			filters={"document_type": self.doc_type},
@@ -56,7 +91,7 @@ class PrintFormat(Document):
 			frappe.throw(_("{0} is required").format(frappe.bold(_("HTML"))), frappe.MandatoryError)
 
 	def extract_images(self):
-		from frappe.core.doctype.file.file import extract_images_from_html
+		from frappe.core.doctype.file.utils import extract_images_from_html
 
 		if self.print_format_builder_beta:
 			return
@@ -96,7 +131,7 @@ class PrintFormat(Document):
 	def export_doc(self):
 		from frappe.modules.utils import export_module_json
 
-		export_module_json(self, self.standard == "Yes", self.module)
+		return export_module_json(self, self.standard == "Yes", self.module)
 
 	def on_trash(self):
 		if self.doc_type:
@@ -110,13 +145,12 @@ def make_default(name):
 
 	print_format = frappe.get_doc("Print Format", name)
 
-	if (frappe.conf.get("developer_mode") or 0) == 1:
-		# developer mode, set it default in doctype
-		doctype = frappe.get_doc("DocType", print_format.doc_type)
+	doctype = frappe.get_doc("DocType", print_format.doc_type)
+	if doctype.custom:
 		doctype.default_print_format = name
 		doctype.save()
 	else:
-		# customization
+		# "Customize form"
 		frappe.make_property_setter(
 			{
 				"doctype_or_field": "DocType",

@@ -1,15 +1,15 @@
 # Copyright (c) 2018, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 import io
-import unittest
 
-from PyPDF2 import PdfFileReader
+from pypdf import PdfReader
 
 import frappe
 import frappe.utils.pdf as pdfgen
+from frappe.tests.utils import FrappeTestCase
 
 
-class TestPdf(unittest.TestCase):
+class TestPdf(FrappeTestCase):
 	@property
 	def html(self):
 		return """<style>
@@ -42,8 +42,8 @@ class TestPdf(unittest.TestCase):
 	def test_pdf_encryption(self):
 		password = "qwe"
 		pdf = pdfgen.get_pdf(self.html, options={"password": password})
-		reader = PdfFileReader(io.BytesIO(pdf))
-		self.assertTrue(reader.isEncrypted)
+		reader = PdfReader(io.BytesIO(pdf))
+		self.assertTrue(reader.is_encrypted)
 		self.assertTrue(reader.decrypt(password))
 
 	def test_pdf_generation_as_a_user(self):

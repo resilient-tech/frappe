@@ -1,11 +1,16 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 import json
+from typing import TYPE_CHECKING, Union
 
 import frappe
 from frappe import _
 from frappe.model.docstatus import DocStatus
 from frappe.utils import cint
+
+if TYPE_CHECKING:
+	from frappe.model.document import Document
+	from frappe.workflow.doctype.workflow.workflow import Workflow
 
 
 class WorkflowStateError(frappe.ValidationError):
@@ -21,31 +26,33 @@ class WorkflowPermissionError(frappe.ValidationError):
 
 
 def get_workflow_name(doctype):
-	workflow_name = frappe.cache().hget("workflow", doctype)
+	workflow_name = frappe.cache.hget("workflow", doctype)
 	if workflow_name is None:
 		workflow_name = frappe.db.get_value(
 			"Workflow", {"document_type": doctype, "is_active": 1}, "name"
 		)
-		frappe.cache().hset("workflow", doctype, workflow_name or "")
+		frappe.cache.hset("workflow", doctype, workflow_name or "")
 
 	return workflow_name
 
 
 @frappe.whitelist()
-def get_transitions(doc, workflow=None, raise_exception=False):
+def get_transitions(
+	doc: Union["Document", str, dict], workflow: "Workflow" = None, raise_exception: bool = False
+) -> list[dict]:
 	"""Return list of possible transitions for the given doc"""
-	doc = frappe.get_doc(frappe.parse_json(doc))
+	from frappe.model.document import Document
+
+	if not isinstance(doc, Document):
+		doc = frappe.get_doc(frappe.parse_json(doc))
+		doc.load_from_db()
 
 	if doc.is_new():
 		return []
 
-	doc.load_from_db()
+	doc.check_permission("read")
 
-	frappe.has_permission(doc, "read", throw=True)
-	roles = frappe.get_roles()
-
-	if not workflow:
-		workflow = get_workflow(doc.doctype)
+	workflow = workflow or get_workflow(doc.doctype)
 	current_state = doc.get(workflow.workflow_state_field)
 
 	if not current_state:
@@ -55,11 +62,14 @@ def get_transitions(doc, workflow=None, raise_exception=False):
 			frappe.throw(_("Workflow State not set"), WorkflowStateError)
 
 	transitions = []
+	roles = frappe.get_roles()
+
 	for transition in workflow.transitions:
 		if transition.state == current_state and transition.allowed in roles:
 			if not is_transition_condition_satisfied(transition, doc):
 				continue
 			transitions.append(transition.as_dict())
+
 	return transitions
 
 
@@ -79,7 +89,7 @@ def get_workflow_safe_globals():
 	)
 
 
-def is_transition_condition_satisfied(transition, doc):
+def is_transition_condition_satisfied(transition, doc) -> bool:
 	if not transition.condition:
 		return True
 	else:
@@ -92,6 +102,7 @@ def is_transition_condition_satisfied(transition, doc):
 def apply_workflow(doc, action):
 	"""Allow workflow action on the current doc"""
 	doc = frappe.get_doc(frappe.parse_json(doc))
+	doc.load_from_db()
 	workflow = get_workflow(doc.doctype)
 	transitions = get_transitions(doc, workflow)
 	user = frappe.session.user
@@ -198,8 +209,8 @@ def validate_workflow(doc):
 			)
 
 
-def get_workflow(doctype):
-	return frappe.get_doc("Workflow", get_workflow_name(doctype))
+def get_workflow(doctype) -> "Workflow":
+	return frappe.get_cached_doc("Workflow", get_workflow_name(doctype))
 
 
 def has_approval_access(user, doc, transition):
@@ -217,11 +228,7 @@ def send_email_alert(workflow_name):
 
 
 def get_workflow_field_value(workflow_name, field):
-	value = frappe.cache().hget("workflow_" + workflow_name, field)
-	if value is None:
-		value = frappe.db.get_value("Workflow", workflow_name, field)
-		frappe.cache().hset("workflow_" + workflow_name, field, value)
-	return value
+	return frappe.get_cached_value("Workflow", workflow_name, field)
 
 
 @frappe.whitelist()
@@ -246,15 +253,15 @@ def bulk_workflow_approval(docnames, doctype, action):
 		except Exception as e:
 			if not frappe.message_log:
 				# Exception is	raised manually and not from msgprint or throw
-				message = "{0}".format(e.__class__.__name__)
+				message = f"{e.__class__.__name__}"
 				if e.args:
-					message += " : {0}".format(e.args[0])
+					message += f" : {e.args[0]}"
 				message_dict = {"docname": docname, "message": message}
 				failed_transactions[docname].append(message_dict)
 
 			frappe.db.rollback()
 			frappe.log_error(
-				title="Workflow {0} threw an error for {1} {2}".format(action, doctype, docname),
+				title=f"Workflow {action} threw an error for {doctype} {docname}",
 				reference_doctype="Workflow",
 				reference_name=action,
 			)
@@ -286,19 +293,19 @@ def bulk_workflow_approval(docnames, doctype, action):
 
 def print_workflow_log(messages, title, doctype, indicator):
 	if messages.keys():
-		msg = "<h4>{0}</h4>".format(title)
+		msg = f"<h4>{title}</h4>"
 
 		for doc in messages.keys():
 			if len(messages[doc]):
-				html = "<details><summary>{0}</summary>".format(frappe.utils.get_link_to_form(doctype, doc))
+				html = f"<details><summary>{frappe.utils.get_link_to_form(doctype, doc)}</summary>"
 				for log in messages[doc]:
 					if log.get("message"):
-						html += "<div class='small text-muted' style='padding:2.5px'>{0}</div>".format(
+						html += "<div class='small text-muted' style='padding:2.5px'>{}</div>".format(
 							log.get("message")
 						)
 				html += "</details>"
 			else:
-				html = "<div>{0}</div>".format(doc)
+				html = f"<div>{doc}</div>"
 			msg += html
 
 		frappe.msgprint(msg, title=_("Workflow Status"), indicator=indicator, is_minimizable=True)

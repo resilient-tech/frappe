@@ -1,10 +1,13 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
+import os
+import random
+import string
 import unittest
-from typing import Dict, List, Optional
+from unittest.mock import patch
 
 import frappe
+from frappe.cache_manager import clear_doctype_cache
 from frappe.core.doctype.doctype.doctype import (
 	CannotIndexedError,
 	DoctypeLinkError,
@@ -15,11 +18,12 @@ from frappe.core.doctype.doctype.doctype import (
 	WrongOptionsDoctypeLinkError,
 	validate_links_table_fieldnames,
 )
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from frappe.desk.form.load import getdoc
+from frappe.tests.utils import FrappeTestCase
 
-# test_records = frappe.get_test_records('DocType')
 
-
-class TestDocType(unittest.TestCase):
+class TestDocType(FrappeTestCase):
 	def tearDown(self):
 		frappe.db.rollback()
 
@@ -37,6 +41,52 @@ class TestDocType(unittest.TestCase):
 
 			doc = new_doctype(name).insert()
 			doc.delete()
+
+	def test_making_sequence_on_change(self):
+		frappe.delete_doc_if_exists("DocType", self._testMethodName)
+		dt = new_doctype(self._testMethodName).insert(ignore_permissions=True)
+		autoname = dt.autoname
+
+		# change autoname
+		dt.autoname = "autoincrement"
+		dt.save()
+
+		# check if name type has been changed
+		self.assertEqual(
+			frappe.db.sql(
+				f"""select data_type FROM information_schema.columns
+				where column_name = 'name' and table_name = 'tab{self._testMethodName}'"""
+			)[0][0],
+			"bigint",
+		)
+
+		if frappe.db.db_type == "mariadb":
+			table_name = "information_schema.tables"
+			conditions = f"table_type = 'sequence' and table_name = '{self._testMethodName}_id_seq'"
+		else:
+			table_name = "information_schema.sequences"
+			conditions = f"sequence_name = '{self._testMethodName}_id_seq'"
+
+		# check if sequence table is created
+		self.assertTrue(
+			frappe.db.sql(
+				f"""select * from {table_name}
+				where {conditions}"""
+			)
+		)
+
+		# change the autoname/naming rule back to original
+		dt.autoname = autoname
+		dt.save()
+
+		# check if name type has changed
+		self.assertEqual(
+			frappe.db.sql(
+				f"""select data_type FROM information_schema.columns
+				where column_name = 'name' and table_name = 'tab{self._testMethodName}'"""
+			)[0][0],
+			"varchar" if frappe.db.db_type == "mariadb" else "character varying",
+		)
 
 	def test_doctype_unique_constraint_dropped(self):
 		if frappe.db.exists("DocType", "With_Unique"):
@@ -124,32 +174,9 @@ class TestDocType(unittest.TestCase):
 				if condition:
 					self.assertFalse(re.match(pattern, condition))
 
-	def test_data_field_options(self):
-		doctype_name = "Test Data Fields"
-		valid_data_field_options = frappe.model.data_field_options + ("",)
-		invalid_data_field_options = ("Invalid Option 1", frappe.utils.random_string(5))
-
-		for field_option in valid_data_field_options + invalid_data_field_options:
-			test_doctype = frappe.get_doc(
-				{
-					"doctype": "DocType",
-					"name": doctype_name,
-					"module": "Core",
-					"custom": 1,
-					"fields": [
-						{"fieldname": "{0}_field".format(field_option), "fieldtype": "Data", "options": field_option}
-					],
-				}
-			)
-
-			if field_option in invalid_data_field_options:
-				# assert that only data options in frappe.model.data_field_options are valid
-				self.assertRaises(frappe.ValidationError, test_doctype.insert)
-			else:
-				test_doctype.insert()
-				self.assertEqual(test_doctype.name, doctype_name)
-				test_doctype.delete()
-
+	@unittest.skipUnless(
+		os.access(frappe.get_app_path("frappe"), os.W_OK), "Only run if frappe app paths is writable"
+	)
 	def test_sync_field_order(self):
 		import os
 
@@ -268,7 +295,7 @@ class TestDocType(unittest.TestCase):
 			self.assertListEqual(
 				test_doctype_json["field_order"], ["field_4", "field_5", "field_1", "field_2"]
 			)
-		except:
+		except Exception:
 			raise
 		finally:
 			frappe.flags.allow_doctype_export = 0
@@ -495,7 +522,7 @@ class TestDocType(unittest.TestCase):
 
 		# check invalid doctype
 		doc.append("links", {"link_doctype": "User2", "link_fieldname": "first_name"})
-		self.assertRaises(frappe.DoesNotExistError, validate_links_table_fieldnames, doc)
+		self.assertRaises(InvalidFieldNameError, validate_links_table_fieldnames, doc)
 		doc.links = []  # reset links table
 
 		# check invalid fieldname
@@ -504,15 +531,46 @@ class TestDocType(unittest.TestCase):
 		self.assertRaises(InvalidFieldNameError, validate_links_table_fieldnames, doc)
 
 	def test_create_virtual_doctype(self):
-		"""Test virtual DOcTYpe."""
+		"""Test virtual DocType."""
 		virtual_doc = new_doctype("Test Virtual Doctype")
 		virtual_doc.is_virtual = 1
-		virtual_doc.insert()
-		virtual_doc.save()
+		virtual_doc.insert(ignore_if_duplicate=True)
+		virtual_doc.reload()
 		doc = frappe.get_doc("DocType", "Test Virtual Doctype")
 
+		self.assertDictEqual(doc.as_dict(), virtual_doc.as_dict())
 		self.assertEqual(doc.is_virtual, 1)
 		self.assertFalse(frappe.db.table_exists("Test Virtual Doctype"))
+
+	def test_create_virtual_doctype_as_child_table(self):
+		"""Test virtual DocType as Child Table below a normal DocType."""
+		frappe.delete_doc_if_exists("DocType", "Test Parent Virtual DocType", force=1)
+		frappe.delete_doc_if_exists("DocType", "Test Virtual DocType as Child Table", force=1)
+
+		virtual_doc = new_doctype("Test Virtual DocType as Child Table")
+		virtual_doc.is_virtual = 1
+		virtual_doc.istable = 1
+		virtual_doc.insert(ignore_permissions=True)
+
+		doc = frappe.get_doc("DocType", "Test Virtual DocType as Child Table")
+
+		self.assertEqual(doc.is_virtual, 1)
+		self.assertEqual(doc.istable, 1)
+		self.assertFalse(frappe.db.table_exists("Test Virtual DocType as Child Table"))
+
+		parent_doc = new_doctype("Test Parent Virtual DocType")
+		parent_doc.append(
+			"fields",
+			{
+				"fieldname": "virtual_child_table",
+				"fieldtype": "Table",
+				"options": "Test Virtual DocType as Child Table",
+			},
+		)
+		self.assertRaises(frappe.exceptions.ValidationError, parent_doc.insert)
+		parent_doc.is_virtual = 1
+		parent_doc.insert(ignore_permissions=True)
+		self.assertFalse(frappe.db.table_exists("Test Parent Virtual DocType"))
 
 	def test_default_fieldname(self):
 		fields = [
@@ -582,15 +640,145 @@ class TestDocType(unittest.TestCase):
 
 		self.assertEqual(test_json.test_json_field["hello"], "world")
 
+	def test_no_delete_doc(self):
+		self.assertRaises(frappe.ValidationError, frappe.delete_doc, "DocType", "Address")
+
+	@unittest.skipUnless(
+		os.access(frappe.get_app_path("frappe"), os.W_OK), "Only run if frappe app paths is writable"
+	)
+	@patch.dict(frappe.conf, {"developer_mode": 1})
+	def test_export_types(self):
+		"""Export python types."""
+		import ast
+
+		from frappe.types.exporter import TypeExporter
+
+		def validate(code):
+			ast.parse(code)
+
+		doctype = new_doctype(custom=0).insert()
+
+		exporter = TypeExporter(doctype)
+		code = exporter.controller_path.read_text()
+		validate(code)
+
+		# regenerate and verify and file is same word to word.
+		exporter.export_types()
+		new_code = exporter.controller_path.read_text()
+		validate(new_code)
+
+		self.assertEqual(code, new_code)
+
+		# Add fields and save
+
+		fieldname = "test_type"
+		doctype.append("fields", {"fieldname": fieldname, "fieldtype": "Int"})
+		doctype.save()
+
+		new_field_code = exporter.controller_path.read_text()
+		validate(new_field_code)
+
+		self.assertIn(fieldname, new_field_code)
+		self.assertIn("Int", new_field_code)
+
+		doctype.delete()
+		frappe.db.commit()
+
+	@unittest.skipUnless(
+		os.access(frappe.get_app_path("frappe"), os.W_OK), "Only run if frappe app paths is writable"
+	)
+	@patch.dict(frappe.conf, {"developer_mode": 1})
+	def test_custom_field_deletion(self):
+		"""Custom child tables whose doctype doesn't exist should be auto deleted."""
+		doctype = new_doctype(custom=0).insert().name
+		child = new_doctype(custom=0, istable=1).insert().name
+
+		field = "abc"
+		create_custom_fields({doctype: [{"fieldname": field, "fieldtype": "Table", "options": child}]})
+
+		frappe.delete_doc("DocType", child)
+		self.assertFalse(frappe.get_meta(doctype).get_field(field))
+
+	@unittest.skipUnless(
+		os.access(frappe.get_app_path("frappe"), os.W_OK), "Only run if frappe app paths is writable"
+	)
+	@patch.dict(frappe.conf, {"developer_mode": 1})
+	def test_delete_doctype_with_customization(self):
+		from frappe.custom.doctype.property_setter.property_setter import make_property_setter
+
+		custom_field = "customfield"
+
+		doctype = new_doctype(custom=0).insert().name
+
+		# Create property setter and custom field
+		field = "some_fieldname"
+		make_property_setter(doctype, field, "default", "DELETETHIS", "Data")
+		create_custom_fields({doctype: [{"fieldname": custom_field, "fieldtype": "Data"}]})
+
+		# Create 1 record
+		original_doc = frappe.get_doc(doctype=doctype, custom_field_name="wat").insert()
+		self.assertEqual(original_doc.some_fieldname, "DELETETHIS")
+
+		# delete doctype
+		frappe.delete_doc("DocType", doctype)
+		clear_doctype_cache(doctype)
+
+		# "restore" doctype by inserting doctype with same schema again
+		new_doctype(doctype, custom=0).insert()
+
+		# Ensure basically same doctype getting "restored"
+		restored_doc = frappe.get_last_doc(doctype)
+		verify_fields = ["doctype", field, custom_field]
+		for f in verify_fields:
+			self.assertEqual(original_doc.get(f), restored_doc.get(f))
+
+		# Check form load of restored doctype
+		getdoc(doctype, restored_doc.name)
+
+		# ensure meta - property setter
+		self.assertEqual(frappe.get_meta(doctype).get_field(field).default, "DELETETHIS")
+		frappe.delete_doc("DocType", doctype)
+
+	def test_not_in_list_view_for_not_allowed_mandatory_field(self):
+		doctype = new_doctype(
+			fields=[
+				{
+					"fieldname": "cover_image",
+					"fieldtype": "Attach Image",
+					"label": "Cover Image",
+					"reqd": 1,  # mandatory
+				},
+				{
+					"fieldname": "book_name",
+					"fieldtype": "Data",
+					"label": "Book Name",
+					"reqd": 1,  # mandatory
+				},
+			],
+		).insert()
+
+		self.assertFalse(doctype.fields[0].in_list_view)
+		self.assertTrue(doctype.fields[1].in_list_view)
+		frappe.delete_doc("DocType", doctype.name)
+
 
 def new_doctype(
-	name, unique: bool = False, depends_on: str = "", fields: Optional[List[Dict]] = None, **kwargs
+	name: str | None = None,
+	unique: bool = False,
+	depends_on: str = "",
+	fields: list[dict] | None = None,
+	custom: bool = True,
+	**kwargs,
 ):
+	if not name:
+		# Test prefix is required to avoid coverage
+		name = "Test " + "".join(random.sample(string.ascii_lowercase, 10))
+
 	doc = frappe.get_doc(
 		{
 			"doctype": "DocType",
 			"module": "Core",
-			"custom": 1,
+			"custom": custom,
 			"fields": [
 				{
 					"label": "Some Field",
@@ -611,8 +799,7 @@ def new_doctype(
 		}
 	)
 
-	if fields:
-		for f in fields:
-			doc.append("fields", f)
+	if fields and len(fields) > 0:
+		doc.set("fields", fields)
 
 	return doc

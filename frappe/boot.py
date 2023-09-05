@@ -8,26 +8,28 @@ import frappe
 import frappe.defaults
 import frappe.desk.desk_page
 from frappe.core.doctype.navbar_settings.navbar_settings import get_app_logo, get_navbar_settings
+from frappe.desk.doctype.form_tour.form_tour import get_onboarding_ui_tours
 from frappe.desk.doctype.route_history.route_history import frequently_visited_links
 from frappe.desk.form.load import get_meta_bundle
 from frappe.email.inbox import get_email_accounts
-from frappe.geo.country_info import get_all
 from frappe.model.base_document import get_controller
+from frappe.permissions import has_permission
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count
-from frappe.query_builder.terms import subqry
+from frappe.query_builder.terms import ParameterizedValueWrapper, SubQuery
 from frappe.social.doctype.energy_point_log.energy_point_log import get_energy_points
 from frappe.social.doctype.energy_point_settings.energy_point_settings import (
 	is_energy_point_enabled,
 )
-from frappe.translate import get_lang_dict
-from frappe.utils import add_user_info, get_time_zone
+from frappe.utils import add_user_info, cstr, get_system_timezone
 from frappe.utils.change_log import get_versions
 from frappe.website.doctype.web_page_view.web_page_view import is_tracking_enabled
 
 
 def get_bootinfo():
 	"""build and return boot info"""
+	from frappe.translate import get_lang_dict, get_translated_doctypes
+
 	frappe.set_user_lang(frappe.session.user)
 	bootinfo = frappe._dict()
 	hooks = frappe.get_hooks()
@@ -68,7 +70,7 @@ def get_bootinfo():
 	bootinfo.home_folder = frappe.db.get_value("File", {"is_home_folder": 1})
 	bootinfo.navbar_settings = get_navbar_settings()
 	bootinfo.notification_settings = get_notification_settings()
-	get_country_codes(bootinfo)
+	bootinfo.onboarding_tours = get_onboarding_ui_tours()
 	set_time_zone(bootinfo)
 
 	# ipinfo
@@ -77,6 +79,8 @@ def get_bootinfo():
 
 	# add docs
 	bootinfo.docs = doclist
+	load_country_doc(bootinfo)
+	load_currency_docs(bootinfo)
 
 	for method in hooks.boot_session or []:
 		frappe.get_attr(method)(bootinfo)
@@ -100,6 +104,9 @@ def get_bootinfo():
 	bootinfo.desk_settings = get_desk_settings()
 	bootinfo.app_logo_url = get_app_logo()
 	bootinfo.link_title_doctypes = get_link_title_doctypes()
+	bootinfo.translated_doctypes = get_translated_doctypes()
+	bootinfo.subscription_conf = add_subscription_conf()
+	bootinfo.marketplace_apps = get_marketplace_apps()
 
 	return bootinfo
 
@@ -127,7 +134,7 @@ def load_desktop_data(bootinfo):
 	from frappe.desk.desktop import get_workspace_sidebar_items
 
 	bootinfo.allowed_workspaces = get_workspace_sidebar_items().get("pages")
-	bootinfo.module_page_map = get_controller("Workspace").get_module_page_map()
+	bootinfo.module_wise_workspaces = get_controller("Workspace").get_module_wise_workspaces()
 	bootinfo.dashboards = frappe.get_all("Dashboard")
 
 
@@ -139,11 +146,13 @@ def get_allowed_reports(cache=False):
 	return get_user_pages_or_reports("Report", cache=cache)
 
 
-def get_user_pages_or_reports(parent, cache=False):
-	_cache = frappe.cache()
+def get_allowed_report_names(cache=False) -> set[str]:
+	return {cstr(report) for report in get_allowed_reports(cache).keys() if report}
 
+
+def get_user_pages_or_reports(parent, cache=False):
 	if cache:
-		has_role = _cache.get_value("has_role:" + parent, user=frappe.session.user)
+		has_role = frappe.cache.get_value("has_role:" + parent, user=frappe.session.user)
 		if has_role:
 			return has_role
 
@@ -210,7 +219,7 @@ def get_user_pages_or_reports(parent, cache=False):
 			if parent == "Report":
 				has_role[p.name].update({"ref_doctype": p.ref_doctype})
 
-	no_of_roles = (
+	no_of_roles = SubQuery(
 		frappe.qb.from_(hasRole).select(Count("*")).where(hasRole.parent == parentTable.name)
 	)
 
@@ -220,7 +229,7 @@ def get_user_pages_or_reports(parent, cache=False):
 		pages_with_no_roles = (
 			frappe.qb.from_(parentTable)
 			.select(parentTable.name, parentTable.modified, *columns)
-			.where(subqry(no_of_roles) == 0)
+			.where(no_of_roles == 0)
 		).run(as_dict=True)
 
 		for p in pages_with_no_roles:
@@ -228,7 +237,10 @@ def get_user_pages_or_reports(parent, cache=False):
 				has_role[p.name] = {"modified": p.modified, "title": p.title}
 
 	elif parent == "Report":
-		reports = frappe.get_all(
+		if not has_permission("Report", raise_exception=False):
+			return {}
+
+		reports = frappe.get_list(
 			"Report",
 			fields=["name", "report_type"],
 			filters={"name": ("in", has_role.keys())},
@@ -237,24 +249,20 @@ def get_user_pages_or_reports(parent, cache=False):
 		for report in reports:
 			has_role[report.name]["report_type"] = report.report_type
 
+		non_permitted_reports = set(has_role.keys()) - {r.name for r in reports}
+		for r in non_permitted_reports:
+			has_role.pop(r, None)
+
 	# Expire every six hours
-	_cache.set_value("has_role:" + parent, has_role, frappe.session.user, 21600)
+	frappe.cache.set_value("has_role:" + parent, has_role, frappe.session.user, 21600)
 	return has_role
 
 
 def load_translations(bootinfo):
-	messages = frappe.get_lang_dict("boot")
+	from frappe.translate import get_messages_for_boot
 
 	bootinfo["lang"] = frappe.lang
-
-	# load translated report names
-	for name in bootinfo.user.all_reports:
-		messages[name] = frappe._(name)
-
-	# only untranslated
-	messages = {k: v for k, v in messages.items() if k != v}
-
-	bootinfo["__messages"] = messages
+	bootinfo["__messages"] = get_messages_for_boot()
 
 
 def get_user_info():
@@ -323,11 +331,11 @@ def get_unseen_notes():
 		frappe.qb.from_(note)
 		.select(note.name, note.title, note.content, note.notify_on_every_login)
 		.where(
-			(note.notify_on_every_login == 1)
+			(note.notify_on_login == 1)
 			& (note.expire_notification_on > frappe.utils.now())
 			& (
-				subqry(frappe.qb.from_(nsb).select(nsb.user).where(nsb.parent == note.name)).notin(
-					[frappe.session.user]
+				ParameterizedValueWrapper(frappe.session.user).notin(
+					SubQuery(frappe.qb.from_(nsb).select(nsb.user).where(nsb.parent == note.name))
 				)
 			)
 		)
@@ -341,7 +349,7 @@ def get_success_action():
 def get_link_preview_doctypes():
 	from frappe.utils import cint
 
-	link_preview_doctypes = [d.name for d in frappe.db.get_all("DocType", {"show_preview_popup": 1})]
+	link_preview_doctypes = [d.name for d in frappe.get_all("DocType", {"show_preview_popup": 1})]
 	customizations = frappe.get_all(
 		"Property Setter", fields=["doc_type", "value"], filters={"property": "show_preview_popup"}
 	)
@@ -386,12 +394,6 @@ def get_notification_settings():
 	return frappe.get_cached_doc("Notification Settings", frappe.session.user)
 
 
-def get_country_codes(bootinfo):
-	country_codes = get_all()
-	bootinfo.country_codes = frappe._dict(country_codes)
-
-
-@frappe.whitelist()
 def get_link_title_doctypes():
 	dts = frappe.get_all("DocType", {"show_title_field_in_link": 1})
 	custom_dts = frappe.get_all(
@@ -404,7 +406,71 @@ def get_link_title_doctypes():
 
 def set_time_zone(bootinfo):
 	bootinfo.time_zone = {
-		"system": get_time_zone(),
+		"system": get_system_timezone(),
 		"user": bootinfo.get("user_info", {}).get(frappe.session.user, {}).get("time_zone", None)
-		or get_time_zone(),
+		or get_system_timezone(),
 	}
+
+
+def load_country_doc(bootinfo):
+	country = frappe.db.get_default("country")
+	if not country:
+		return
+	try:
+		bootinfo.docs.append(frappe.get_cached_doc("Country", country))
+	except Exception:
+		pass
+
+
+def load_currency_docs(bootinfo):
+	currency = frappe.qb.DocType("Currency")
+
+	currency_docs = (
+		frappe.qb.from_(currency)
+		.select(
+			currency.name,
+			currency.fraction,
+			currency.fraction_units,
+			currency.number_format,
+			currency.smallest_currency_fraction_value,
+			currency.symbol,
+			currency.symbol_on_right,
+		)
+		.where(currency.enabled == 1)
+		.run(as_dict=1, update={"doctype": ":Currency"})
+	)
+
+	bootinfo.docs += currency_docs
+
+
+def get_marketplace_apps():
+	import requests
+
+	apps = []
+	cache_key = "frappe_marketplace_apps"
+
+	if frappe.conf.developer_mode:
+		return apps
+
+	def get_apps_from_fc():
+		remote_site = frappe.conf.frappecloud_url or "frappecloud.com"
+		request_url = f"https://{remote_site}/api/method/press.api.marketplace.get_marketplace_apps"
+		request = requests.get(request_url, timeout=2.0)
+		return request.json()["message"]
+
+	try:
+		apps = frappe.cache().get_value(cache_key, get_apps_from_fc, shared=True)
+		installed_apps = set(frappe.get_installed_apps())
+		apps = [app for app in apps if app["name"] not in installed_apps]
+	except Exception:
+		# Don't retry for a day
+		frappe.cache().set_value(cache_key, apps, shared=True, expires_in_sec=24 * 60 * 60)
+
+	return apps
+
+
+def add_subscription_conf():
+	try:
+		return frappe.conf.subscription
+	except Exception:
+		return ""

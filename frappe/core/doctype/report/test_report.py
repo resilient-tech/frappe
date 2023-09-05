@@ -18,11 +18,16 @@ test_dependencies = ["User"]
 
 
 class TestReport(FrappeTestCase):
+	@classmethod
+	def setUpClass(cls) -> None:
+		cls.enable_safe_exec()
+		return super().setUpClass()
+
 	def test_report_builder(self):
 		if frappe.db.exists("Report", "User Activity Report"):
 			frappe.delete_doc("Report", "User Activity Report")
 
-		with open(os.path.join(os.path.dirname(__file__), "user_activity_report.json"), "r") as f:
+		with open(os.path.join(os.path.dirname(__file__), "user_activity_report.json")) as f:
 			frappe.get_doc(json.loads(f.read())).insert()
 
 		report = frappe.get_doc("Report", "User Activity Report")
@@ -118,11 +123,10 @@ class TestReport(FrappeTestCase):
 					}
 				]
 			),
+			json.dumps({"user": "Administrator", "doctype": "User"}),
 		)
 		custom_report = frappe.get_doc("Report", custom_report_name)
-		columns, result = custom_report.run_query_report(
-			filters={"user": "Administrator", "doctype": "User"}, user=frappe.session.user
-		)
+		columns, result = custom_report.run_query_report(user=frappe.session.user)
 
 		self.assertListEqual(["email"], [column.get("fieldname") for column in columns])
 		admin_dict = frappe.core.utils.find(result, lambda d: d["name"] == "Administrator")
@@ -186,12 +190,44 @@ class TestReport(FrappeTestCase):
 		self.assertNotEqual(report.is_permitted(), True)
 		frappe.set_user("Administrator")
 
+	def test_report_custom_permissions(self):
+		frappe.set_user("test@example.com")
+		frappe.db.delete("Custom Role", {"report": "Test Custom Role Report"})
+		frappe.db.commit()  # nosemgrep
+		if not frappe.db.exists("Report", "Test Custom Role Report"):
+			report = frappe.get_doc(
+				{
+					"doctype": "Report",
+					"ref_doctype": "User",
+					"report_name": "Test Custom Role Report",
+					"report_type": "Query Report",
+					"is_standard": "No",
+					"roles": [{"role": "_Test Role"}, {"role": "System Manager"}],
+				}
+			).insert(ignore_permissions=True)
+		else:
+			report = frappe.get_doc("Report", "Test Custom Role Report")
+
+		self.assertEqual(report.is_permitted(), True)
+
+		frappe.get_doc(
+			{
+				"doctype": "Custom Role",
+				"report": "Test Custom Role Report",
+				"roles": [{"role": "_Test Role 2"}],
+				"ref_doctype": "User",
+			}
+		).insert(ignore_permissions=True)
+
+		self.assertNotEqual(report.is_permitted(), True)
+		frappe.set_user("Administrator")
+
 	# test for the `_format` method if report data doesn't have sort_by parameter
 	def test_format_method(self):
 		if frappe.db.exists("Report", "User Activity Report Without Sort"):
 			frappe.delete_doc("Report", "User Activity Report Without Sort")
 		with open(
-			os.path.join(os.path.dirname(__file__), "user_activity_report_without_sort.json"), "r"
+			os.path.join(os.path.dirname(__file__), "user_activity_report_without_sort.json")
 		) as f:
 			frappe.get_doc(json.loads(f.read())).insert()
 

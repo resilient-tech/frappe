@@ -7,13 +7,12 @@ import importlib
 import json
 import os
 import shlex
-import shutil
 import subprocess
 import unittest
 from contextlib import contextmanager
 from functools import wraps
 from glob import glob
-from typing import List, Optional
+from pathlib import Path
 from unittest.case import skipIf
 from unittest.mock import patch
 
@@ -21,17 +20,24 @@ from unittest.mock import patch
 import click
 from click import Command
 from click.testing import CliRunner, Result
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 # imports - module imports
 import frappe
+import frappe.commands.scheduler
 import frappe.commands.site
 import frappe.commands.utils
 import frappe.recorder
 from frappe.installer import add_to_installed_apps, remove_app
+from frappe.query_builder.utils import db_type_is
+from frappe.tests.test_query_builder import run_only_if
+from frappe.tests.utils import FrappeTestCase, timeout
 from frappe.utils import add_to_date, get_bench_path, get_bench_relative_path, now
-from frappe.utils.backups import fetch_latest_backups
+from frappe.utils.backups import BackupGenerator, fetch_latest_backups
+from frappe.utils.jinja_globals import bundled_asset
+from frappe.utils.scheduler import enable_scheduler, is_scheduler_inactive
 
-_result: Optional[Result] = None
+_result: Result | None = None
 TEST_SITE = "commands-site-O4PN2QKA.test"  # added random string tag to avoid collisions
 CLI_CONTEXT = frappe._dict(sites=[TEST_SITE])
 
@@ -52,7 +58,7 @@ def clean(value) -> str:
 	return value
 
 
-def missing_in_backup(doctypes: List, file: os.PathLike) -> List:
+def missing_in_backup(doctypes: list, file: os.PathLike) -> list:
 	"""Returns list of missing doctypes in the backup.
 
 	Args:
@@ -69,7 +75,7 @@ def missing_in_backup(doctypes: List, file: os.PathLike) -> List:
 	return [doctype for doctype in doctypes if predicate.format(doctype).lower() not in content]
 
 
-def exists_in_backup(doctypes: List, file: os.PathLike) -> bool:
+def exists_in_backup(doctypes: list, file: os.PathLike) -> bool:
 	"""Checks if the list of doctypes exist in the database.sql.gz file supplied
 
 	Args:
@@ -108,7 +114,7 @@ def pass_test_context(f):
 
 
 @contextmanager
-def cli(cmd: Command, args: Optional[List] = None):
+def cli(cmd: Command, args: list | None = None):
 	with maintain_locals():
 		global _result
 
@@ -132,14 +138,17 @@ def cli(cmd: Command, args: Optional[List] = None):
 			importlib.invalidate_caches()
 
 
-class BaseTestCommands(unittest.TestCase):
+class BaseTestCommands(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls) -> None:
+		super().setUpClass()
 		cls.setup_test_site()
-		return super().setUpClass()
 
 	@classmethod
 	def execute(self, command, kwargs=None):
+		# tests might have written to DB which wont be visible to commands until we end current transaction
+		frappe.db.commit()
+
 		site = {"site": frappe.local.site}
 		cmd_input = None
 		if kwargs:
@@ -157,12 +166,13 @@ class BaseTestCommands(unittest.TestCase):
 		click.secho(self.command, fg="bright_black")
 
 		command = shlex.split(self.command)
-		self._proc = subprocess.run(
-			command, input=cmd_input, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-		)
+		self._proc = subprocess.run(command, input=cmd_input, capture_output=True)
 		self.stdout = clean(self._proc.stdout)
 		self.stderr = clean(self._proc.stderr)
 		self.returncode = clean(self._proc.returncode)
+
+		# Commands might have written to DB which wont be visible until we end current transaction
+		frappe.db.rollback()
 
 	@classmethod
 	def setup_test_site(cls):
@@ -181,7 +191,7 @@ class BaseTestCommands(unittest.TestCase):
 			)
 
 	def _formatMessage(self, msg, standardMsg):
-		output = super(BaseTestCommands, self)._formatMessage(msg, standardMsg)
+		output = super()._formatMessage(msg, standardMsg)
 
 		if not hasattr(self, "command") and _result:
 			command = _result.command
@@ -198,14 +208,14 @@ class BaseTestCommands(unittest.TestCase):
 			[
 				"-" * 70,
 				"Last Command Execution Summary:",
-				"Command: {}".format(command) if command else "",
-				"Standard Output: {}".format(stdout) if stdout else "",
-				"Standard Error: {}".format(stderr) if stderr else "",
-				"Return Code: {}".format(returncode) if returncode else "",
+				f"Command: {command}" if command else "",
+				f"Standard Output: {stdout}" if stdout else "",
+				f"Standard Error: {stderr}" if stderr else "",
+				f"Return Code: {returncode}" if returncode else "",
 			]
 		).strip()
 
-		return "{}\n\n{}".format(output, cmd_execution_summary)
+		return f"{output}\n\n{cmd_execution_summary}"
 
 
 class TestCommands(BaseTestCommands):
@@ -299,6 +309,7 @@ class TestCommands(BaseTestCommands):
 		frappe.local.cache = {}
 		self.assertEqual(frappe.recorder.status(), False)
 
+	@unittest.skip("Poorly written, relied on app name being absent in apps.txt")
 	def test_remove_from_installed_apps(self):
 		app = "test_remove_app"
 		add_to_installed_apps(app)
@@ -322,10 +333,10 @@ class TestCommands(BaseTestCommands):
 		# test 2: bare functionality for single site
 		self.execute("bench --site {site} list-apps")
 		self.assertEqual(self.returncode, 0)
-		list_apps = set(_x.split()[0] for _x in self.stdout.split("\n"))
+		list_apps = {_x.split(maxsplit=1)[0] for _x in self.stdout.split("\n")}
 		doctype = frappe.get_single("Installed Applications").installed_applications
 		if doctype:
-			installed_apps = set(x.app_name for x in doctype)
+			installed_apps = {x.app_name for x in doctype}
 		else:
 			installed_apps = set(frappe.get_installed_apps())
 		self.assertSetEqual(list_apps, installed_apps)
@@ -406,32 +417,16 @@ class TestCommands(BaseTestCommands):
 		self.execute("bench --site {site} set-password Administrator test1")
 		self.assertEqual(self.returncode, 0)
 		self.assertEqual(check_password("Administrator", "test1"), "Administrator")
-		# to release the lock taken by check_password
-		frappe.db.commit()
 
 		self.execute("bench --site {site} set-admin-password test2")
 		self.assertEqual(self.returncode, 0)
 		self.assertEqual(check_password("Administrator", "test2"), "Administrator")
 
-	def test_make_app(self):
-		user_input = [
-			b"Test App",  # title
-			b"This app's description contains 'single quotes' and \"double quotes\".",  # description
-			b"Test Publisher",  # publisher
-			b"example@example.org",  # email
-			b"",  # icon
-			b"",  # color
-			b"MIT",  # app_license
-		]
-		app_name = "testapp0"
-		apps_path = os.path.join(get_bench_path(), "apps")
-		test_app_path = os.path.join(apps_path, app_name)
-		self.execute(f"bench make-app {apps_path} {app_name}", {"cmd_input": b"\n".join(user_input)})
+		# Reset it back to original password
+		original_password = frappe.conf.admin_password or "admin"
+		self.execute("bench --site {site} set-admin-password %s" % original_password)
 		self.assertEqual(self.returncode, 0)
-		self.assertTrue(os.path.exists(test_app_path))
-
-		# cleanup
-		shutil.rmtree(test_app_path)
+		self.assertEqual(check_password("Administrator", original_password), "Administrator")
 
 	@skipIf(
 		not (
@@ -447,7 +442,7 @@ class TestCommands(BaseTestCommands):
 			f"bench new-site {site} --force --verbose "
 			f"--admin-password {frappe.conf.admin_password} "
 			f"--mariadb-root-password {frappe.conf.root_password} "
-			f"--db-type {frappe.conf.db_type or 'mariadb'} "
+			f"--db-type {frappe.conf.db_type} "
 		)
 		self.assertEqual(self.returncode, 0)
 
@@ -459,6 +454,44 @@ class TestCommands(BaseTestCommands):
 		self.assertFalse(os.path.exists(site_directory))
 		archive_directory = os.path.join(bench_path, f"archived/sites/{site}")
 		self.assertTrue(os.path.exists(archive_directory))
+
+	@skipIf(
+		not (
+			frappe.conf.root_password and frappe.conf.admin_password and frappe.conf.db_type == "mariadb"
+		),
+		"DB Root password and Admin password not set in config",
+	)
+	def test_force_install_app(self):
+		if not os.path.exists(os.path.join(get_bench_path(), f"sites/{TEST_SITE}")):
+			self.execute(
+				f"bench new-site {TEST_SITE} --verbose "
+				f"--admin-password {frappe.conf.admin_password} "
+				f"--mariadb-root-password {frappe.conf.root_password} "
+				f"--db-type {frappe.conf.db_type} "
+			)
+
+		app_name = "frappe"
+
+		# set admin password in site_config as when frappe force installs, we don't have the conf
+		self.execute(f"bench --site {TEST_SITE} set-config admin_password {frappe.conf.admin_password}")
+
+		# try installing the frappe_docs app again on test site
+		self.execute(f"bench --site {TEST_SITE} install-app {app_name}")
+		self.assertIn(f"{app_name} already installed", self.stdout)
+		self.assertEqual(self.returncode, 0)
+
+		# force install frappe_docs app on the test site
+		self.execute(f"bench --site {TEST_SITE} install-app {app_name} --force")
+		self.assertIn(f"Installing {app_name}", self.stdout)
+		self.assertEqual(self.returncode, 0)
+
+	def test_set_global_conf(self):
+		key = "answer"
+		value = "42"
+		self.execute(f"bench set-config {key} {value} -g")
+		conf = frappe.get_site_config()
+
+		self.assertEqual(conf[key], value)
 
 
 class TestBackups(BaseTestCommands):
@@ -496,6 +529,19 @@ class TestBackups(BaseTestCommands):
 		self.assertIn("successfully completed", self.stdout)
 		self.assertNotEqual(before_backup["database"], after_backup["database"])
 
+	def test_backup_fails_with_exit_code(self):
+		"""Provide incorrect options to check if exit code is 1"""
+		odb = BackupGenerator(
+			frappe.conf.db_name,
+			frappe.conf.db_name,
+			frappe.conf.db_password + "INCORRECT PASSWORD",
+			db_host=frappe.conf.db_host,
+			db_port=frappe.conf.db_port,
+			db_type=frappe.conf.db_type,
+		)
+		with self.assertRaises(Exception):
+			odb.take_dump()
+
 	def test_backup_with_files(self):
 		"""Take a backup with files (--with-files)"""
 		before_backup = fetch_latest_backups()
@@ -508,6 +554,23 @@ class TestBackups(BaseTestCommands):
 		self.assertNotEqual(before_backup, after_backup)
 		self.assertIsNotNone(after_backup["public"])
 		self.assertIsNotNone(after_backup["private"])
+
+	@run_only_if(db_type_is.MARIADB)
+	def test_clear_log_table(self):
+		d = frappe.get_doc(doctype="Error Log", title="Something").insert()
+		d.db_set("modified", "2010-01-01", update_modified=False)
+		frappe.db.commit()
+
+		tables_before = frappe.db.get_tables(cached=False)
+
+		self.execute("bench --site {site} clear-log-table --days=30 --doctype='Error Log'")
+		self.assertEqual(self.returncode, 0)
+		frappe.db.commit()
+
+		self.assertFalse(frappe.db.exists("Error Log", d.name))
+		tables_after = frappe.db.get_tables(cached=False)
+
+		self.assertEqual(set(tables_before), set(tables_after))
 
 	def test_backup_with_custom_path(self):
 		"""Backup to a custom path (--backup-path)"""
@@ -609,7 +672,7 @@ class TestBackups(BaseTestCommands):
 		self.assertEqual([], missing_in_backup(self.backup_map["excludes"]["excludes"], database))
 
 
-class TestRemoveApp(unittest.TestCase):
+class TestRemoveApp(FrappeTestCase):
 	def test_delete_modules(self):
 		from frappe.installer import (
 			_delete_doctypes,
@@ -663,8 +726,115 @@ class TestSiteMigration(BaseTestCommands):
 			self.assertEqual(result.exception, None)
 
 
+class TestAddNewUser(BaseTestCommands):
+	def test_create_user(self):
+		self.execute(
+			"bench --site {site} add-user test@gmail.com --first-name test --last-name test --password 123 --user-type 'System User' --add-role 'Accounts User' --add-role 'Sales User'"
+		)
+		self.assertEqual(self.returncode, 0)
+		user = frappe.get_doc("User", "test@gmail.com")
+		roles = {r.role for r in user.roles}
+		self.assertEqual({"Accounts User", "Sales User"}, roles)
+
+
 class TestBenchBuild(BaseTestCommands):
-	def test_build_assets(self):
-		with cli(frappe.commands.utils.build) as result:
+	def test_build_assets_size_check(self):
+		with cli(frappe.commands.utils.build, "--force --production") as result:
 			self.assertEqual(result.exit_code, 0)
 			self.assertEqual(result.exception, None)
+
+		CURRENT_SIZE = 3.5  # MB
+		JS_ASSET_THRESHOLD = 0.1
+
+		hooks = frappe.get_hooks()
+		default_bundle = hooks["app_include_js"]
+
+		default_bundle_size = 0.0
+
+		for chunk in default_bundle:
+			abs_path = Path.cwd() / frappe.local.sites_path / bundled_asset(chunk)[1:]
+			default_bundle_size += abs_path.stat().st_size
+
+		self.assertLessEqual(
+			default_bundle_size / (1024 * 1024),
+			CURRENT_SIZE * (1 + JS_ASSET_THRESHOLD),
+			f"Default JS bundle size increased by {JS_ASSET_THRESHOLD:.2%} or more",
+		)
+
+
+class TestSchedulerUtils(BaseTestCommands):
+	# Retry just in case there are stuck queued jobs
+	@retry(
+		retry=retry_if_exception_type(AssertionError),
+		stop=stop_after_attempt(3),
+		wait=wait_fixed(3),
+		reraise=True,
+	)
+	def test_ready_for_migrate(self):
+		with cli(frappe.commands.scheduler.ready_for_migration) as result:
+			self.assertEqual(result.exit_code, 0)
+
+
+class TestCommandUtils(FrappeTestCase):
+	def test_bench_helper(self):
+		from frappe.utils.bench_helper import get_app_groups
+
+		app_groups = get_app_groups()
+		self.assertIn("frappe", app_groups)
+		self.assertIsInstance(app_groups["frappe"], click.Group)
+
+
+class TestDBCli(BaseTestCommands):
+	@timeout(10)
+	def test_db_cli(self):
+		self.execute("bench --site {site} db-console", kwargs={"cmd_input": rb"\q"})
+		self.assertEqual(self.returncode, 0)
+
+	@run_only_if(db_type_is.MARIADB)
+	def test_db_cli_with_sql(self):
+		self.execute("bench --site {site} db-console -e 'select 1'")
+		self.assertEqual(self.returncode, 0)
+		self.assertIn("1", self.stdout)
+
+
+class TestSchedulerCLI(BaseTestCommands):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		cls.is_scheduler_active = not is_scheduler_inactive()
+
+	@classmethod
+	def tearDownClass(cls):
+		super().tearDownClass()
+		if cls.is_scheduler_active:
+			enable_scheduler()
+
+	def test_scheduler_status(self):
+		self.execute("bench --site {site} scheduler status")
+		self.assertEqual(self.returncode, 0)
+		self.assertRegex(self.stdout, r"Scheduler is (disabled|enabled) for site .*")
+
+		self.execute("bench --site {site} scheduler status -f json")
+		parsed_output = frappe.parse_json(self.stdout)
+		self.assertEqual(self.returncode, 0)
+		self.assertIsInstance(parsed_output, dict)
+		self.assertIn("status", parsed_output)
+		self.assertIn("site", parsed_output)
+
+	def test_scheduler_enable_disable(self):
+		self.execute("bench --site {site} scheduler disable")
+		self.assertEqual(self.returncode, 0)
+		self.assertRegex(self.stdout, r"Scheduler is disabled for site .*")
+
+		self.execute("bench --site {site} scheduler enable")
+		self.assertEqual(self.returncode, 0)
+		self.assertRegex(self.stdout, r"Scheduler is enabled for site .*")
+
+	def test_scheduler_pause_resume(self):
+		self.execute("bench --site {site} scheduler pause")
+		self.assertEqual(self.returncode, 0)
+		self.assertRegex(self.stdout, r"Scheduler is paused for site .*")
+
+		self.execute("bench --site {site} scheduler resume")
+		self.assertEqual(self.returncode, 0)
+		self.assertRegex(self.stdout, r"Scheduler is resumed for site .*")

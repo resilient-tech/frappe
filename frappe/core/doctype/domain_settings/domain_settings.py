@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2017, Frappe Technologies and contributors
 # License: MIT. See LICENSE
 
@@ -7,6 +6,17 @@ from frappe.model.document import Document
 
 
 class DomainSettings(Document):
+	# begin: auto-generated types
+	# This code is auto-generated. Do not modify anything in this block.
+
+	from typing import TYPE_CHECKING
+
+	if TYPE_CHECKING:
+		from frappe.core.doctype.has_domain.has_domain import HasDomain
+		from frappe.types import DF
+
+		active_domains: DF.Table[HasDomain]
+	# end: auto-generated types
 	def set_active_domains(self, domains):
 		active_domains = [d.domain for d in self.active_domains]
 		added = False
@@ -32,7 +42,7 @@ class DomainSettings(Document):
 	def restrict_roles_and_modules(self):
 		"""Disable all restricted roles and set `restrict_to_domain` property in Module Def"""
 		active_domains = frappe.get_active_domains()
-		all_domains = list((frappe.get_hooks("domains") or {}))
+		all_domains = list(frappe.get_hooks("domains") or {})
 
 		def remove_role(role):
 			frappe.db.delete("Has Role", {"role": role})
@@ -74,7 +84,7 @@ def get_active_domains():
 		active_domains.append("")
 		return active_domains
 
-	return frappe.cache().get_value("active_domains", _get_active_domains)
+	return frappe.cache.get_value("active_domains", _get_active_domains)
 
 
 def get_active_modules():
@@ -88,4 +98,4 @@ def get_active_modules():
 				active_modules.append(m.name)
 		return active_modules
 
-	return frappe.cache().get_value("active_modules", _get_active_modules)
+	return frappe.cache.get_value("active_modules", _get_active_modules)

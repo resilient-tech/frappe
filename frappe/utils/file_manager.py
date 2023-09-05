@@ -7,23 +7,13 @@ import io
 import json
 import mimetypes
 import os
-import re
 from copy import copy
 from urllib.parse import unquote
 
 import frappe
 from frappe import _, conf
 from frappe.query_builder.utils import DocType
-from frappe.utils import (
-	call_hook_method,
-	cint,
-	cstr,
-	encode,
-	get_files_path,
-	get_hook_method,
-	random_string,
-)
-from frappe.utils.image import optimize_image
+from frappe.utils import call_hook_method, cint, cstr, encode, get_files_path, get_hook_method
 
 
 class MaxFileSizeReachedError(frappe.ValidationError):
@@ -64,19 +54,12 @@ def upload():
 
 	comment = {}
 	if dt and dn:
+		file_url = file_doc.file_url.replace("#", "%23") if file_doc.file_name else file_doc.file_url
+		icon = ' <i class="fa fa-lock text-warning"></i>' if file_doc.is_private else ""
+		file_name = file_doc.file_name or file_doc.file_url
 		comment = frappe.get_doc(dt, dn).add_comment(
 			"Attachment",
-			_("added {0}").format(
-				"<a href='{file_url}' target='_blank'>{file_name}</a>{icon}".format(
-					**{
-						"icon": ' <i class="fa fa-lock text-warning"></i>' if file_doc.is_private else "",
-						"file_url": file_doc.file_url.replace("#", "%23")
-						if file_doc.file_name
-						else file_doc.file_url,
-						"file_name": file_doc.file_name or file_doc.file_url,
-					}
-				)
-			),
+			f"<a href='{file_url}' target='_blank'>{file_name}</a>{icon}",
 		)
 
 	return {
@@ -219,9 +202,9 @@ def save_file_on_filesystem(fname, content, content_type=None, is_private=0):
 	fpath = write_file(content, fname, is_private)
 
 	if is_private:
-		file_url = "/private/files/{0}".format(fname)
+		file_url = f"/private/files/{fname}"
 	else:
-		file_url = "/files/{0}".format(fname)
+		file_url = f"/files/{fname}"
 
 	return {"file_name": os.path.basename(fpath), "file_url": file_url}
 
@@ -305,7 +288,7 @@ def remove_file(
 			ignore_permissions = True
 		if not file_name:
 			file_name = frappe.db.get_value("File", fid, "file_name")
-		comment = doc.add_comment("Attachment Removed", _("Removed {0}").format(file_name))
+		comment = doc.add_comment("Attachment Removed", file_name)
 		frappe.delete_doc(
 			"File", fid, ignore_permissions=ignore_permissions, delete_permanently=delete_permanently
 		)
@@ -352,7 +335,7 @@ def get_file(fname):
 	file_path = get_file_path(fname)
 
 	# read the file
-	with io.open(encode(file_path), mode="rb") as f:
+	with open(encode(file_path), mode="rb") as f:
 		content = f.read()
 		try:
 			# for plain text files
@@ -415,7 +398,7 @@ def get_file_name(fname, optional_suffix):
 			partial, extn = f[0], ""
 		else:
 			partial, extn = f[0], "." + f[1]
-		return "{partial}{suffix}{extn}".format(partial=partial, extn=extn, suffix=optional_suffix)
+		return f"{partial}{optional_suffix}{extn}"
 	return fname
 
 
@@ -459,3 +442,15 @@ def add_attachments(doctype, name, attachments):
 			files.append(f)
 
 	return files
+
+
+def is_safe_path(path: str) -> bool:
+	if path.startswith(("http://", "https://")):
+		return True
+
+	basedir = frappe.get_site_path()
+	# ref: https://docs.python.org/3/library/os.path.html#os.path.commonpath
+	matchpath = os.path.abspath(path)
+	basedir = os.path.abspath(basedir)
+
+	return basedir == os.path.commonpath((basedir, matchpath))

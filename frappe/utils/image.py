@@ -7,8 +7,6 @@ from PIL import Image
 
 
 def resize_images(path, maxdim=700):
-	from PIL import Image
-
 	size = (maxdim, maxdim)
 	for basepath, folders, files in os.walk(path):
 		for fname in files:
@@ -16,10 +14,10 @@ def resize_images(path, maxdim=700):
 			if extn in ("jpg", "jpeg", "png", "gif"):
 				im = Image.open(os.path.join(basepath, fname))
 				if im.size[0] > size[0] or im.size[1] > size[1]:
-					im.thumbnail(size, Image.ANTIALIAS)
+					im.thumbnail(size, Image.Resampling.LANCZOS)
 					im.save(os.path.join(basepath, fname))
 
-					print("resized {0}".format(os.path.join(basepath, fname)))
+					print(f"resized {os.path.join(basepath, fname)}")
 
 
 def strip_exif_data(content, content_type):
@@ -48,15 +46,18 @@ def strip_exif_data(content, content_type):
 
 
 def optimize_image(
-	content, content_type, max_width=1920, max_height=1080, optimize=True, quality=85
+	content, content_type, max_width=1024, max_height=768, optimize=True, quality=85
 ):
 	if content_type == "image/svg+xml":
 		return content
 
 	image = Image.open(io.BytesIO(content))
+	width, height = image.size
+	max_height = max(min(max_height, height * 0.8), 200)
+	max_width = max(min(max_width, width * 0.8), 200)
 	image_format = content_type.split("/")[1]
 	size = max_width, max_height
-	image.thumbnail(size, Image.LANCZOS)
+	image.thumbnail(size, Image.Resampling.LANCZOS)
 
 	output = io.BytesIO()
 	image.save(
