@@ -1396,6 +1396,9 @@ class Document(BaseDocument):
 		).insert(ignore_permissions=True)
 
 	def add_seen(self, user=None):
+		frappe.request.after_response.add(lambda: self._add_seen(user))
+
+	def _add_seen(self, user=None):
 		"""add the given/current user to list of users who have seen this document (_seen)"""
 		if not user:
 			user = frappe.session.user
@@ -1407,9 +1410,12 @@ class Document(BaseDocument):
 			if user not in _seen:
 				_seen.append(user)
 				frappe.db.set_value(self.doctype, self.name, "_seen", json.dumps(_seen), update_modified=False)
-				frappe.local.flags.commit = True
+				frappe.db.commit()  # nosemgrep: commit required for after_request event
 
 	def add_viewed(self, user=None, force=False, unique_views=False):
+		frappe.request.after_response.add(lambda: self._add_viewed(user, force, unique_views))
+
+	def _add_viewed(self, user=None, force=False, unique_views=False):
 		"""add log to communication when a user views a document"""
 		if not user:
 			user = frappe.session.user
@@ -1432,7 +1438,7 @@ class Document(BaseDocument):
 				view_log.deferred_insert()
 			else:
 				view_log.insert(ignore_permissions=True)
-				frappe.local.flags.commit = True
+				frappe.db.commit()
 
 			return view_log
 

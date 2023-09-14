@@ -393,9 +393,7 @@ def handle_exception(e):
 def sync_database(rollback: bool) -> bool:
 	# if HTTP method would change server state, commit if necessary
 	if (
-		frappe.db
-		and (frappe.local.flags.commit or frappe.local.request.method in UNSAFE_HTTP_METHODS)
-		and frappe.db.transaction_writes
+		frappe.db and frappe.local.request.method in UNSAFE_HTTP_METHODS and frappe.db.transaction_writes
 	):
 		frappe.db.commit()
 		rollback = False
