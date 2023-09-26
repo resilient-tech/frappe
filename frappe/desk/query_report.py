@@ -25,8 +25,7 @@ def get_report_doc(report_name):
 
 	if doc.report_type == "Custom Report":
 		custom_report_doc = doc
-		reference_report = custom_report_doc.reference_report
-		doc = frappe.get_doc("Report", reference_report)
+		doc = get_reference_report(doc)
 		doc.custom_report = report_name
 		if custom_report_doc.json:
 			data = json.loads(custom_report_doc.json)
@@ -84,8 +83,8 @@ def generate_report_result(
 	columns, result, message, chart, report_summary, skip_total_row = ljust_list(res, 6)
 	columns = [get_column_as_dict(col) for col in (columns or [])]
 	report_column_names = [col["fieldname"] for col in columns]
-
 	# convert to list of dicts
+
 	result = normalize_result(result, columns)
 
 	if report.custom_columns:
@@ -172,7 +171,15 @@ def get_script(report_name):
 		"html_format": html_format,
 		"execution_time": frappe.cache.hget("report_execution_time", report_name) or 0,
 		"filters": report.filters,
+		"custom_report_name": report.name if report.get("is_custom_report") else None,
 	}
+
+
+def get_reference_report(report):
+	if report.report_type != "Custom Report":
+		return report
+	reference_report = frappe.get_doc("Report", report.reference_report)
+	return get_reference_report(reference_report)
 
 
 @frappe.whitelist()
@@ -223,6 +230,14 @@ def run(
 
 
 def add_custom_column_data(custom_columns, result):
+	doctype_names_from_custom_field = []
+	for column in custom_columns:
+		if len(column["fieldname"].split("-")) > 1:
+			# length greater than 1, means that the column is a custom field with confilicting fieldname
+			doctype_name = frappe.unscrub(column["fieldname"].split("-")[1])
+			doctype_names_from_custom_field.append(doctype_name)
+		column["fieldname"] = column["fieldname"].split("-")[0]
+
 	custom_column_data = get_data_for_custom_report(custom_columns, result)
 
 	for column in custom_columns:
@@ -240,6 +255,8 @@ def add_custom_column_data(custom_columns, result):
 				# possible if the row is empty
 				if not row_reference:
 					continue
+				if key[0] in doctype_names_from_custom_field:
+					column["fieldname"] = column.get("id")
 				row[column.get("fieldname")] = custom_column_data.get(key).get(row_reference)
 
 	return result
@@ -494,10 +511,13 @@ def get_data_for_custom_report(columns, result):
 			doctype = column.get("doctype")
 
 			row_key = link_field.get("fieldname")
-			names = list({row[row_key] for row in result}) or None
+			names = []
+			for row in result:
+				if row.get(row_key):
+					names.append(row.get(row_key))
+			names = list(set(names))
 
 			doc_field_value_map[(doctype, fieldname)] = get_data_for_custom_field(doctype, fieldname, names)
-
 	return doc_field_value_map
 
 

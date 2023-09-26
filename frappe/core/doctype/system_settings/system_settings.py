@@ -24,6 +24,7 @@ class SystemSettings(Document):
 		allow_login_using_mobile_number: DF.Check
 		allow_login_using_user_name: DF.Check
 		allow_older_web_view_links: DF.Check
+		allowed_file_extensions: DF.SmallText | None
 		app_name: DF.Data | None
 		apply_strict_user_permissions: DF.Check
 		attach_view_link: DF.Check
@@ -64,6 +65,7 @@ class SystemSettings(Document):
 		login_with_email_link_expiry: DF.Int
 		logout_on_password_reset: DF.Check
 		max_auto_email_report_per_user: DF.Int
+		max_file_size: DF.Int
 		minimum_password_score: DF.Literal["2", "3", "4"]
 		number_format: DF.Literal[
 			"#,###.##",
@@ -126,6 +128,7 @@ class SystemSettings(Document):
 
 		self.validate_user_pass_login()
 		self.validate_backup_limit()
+		self.validate_file_extensions()
 
 	def validate_user_pass_login(self):
 		if not self.disable_user_pass_login:
@@ -148,6 +151,14 @@ class SystemSettings(Document):
 		if not self.backup_limit or self.backup_limit < 1:
 			frappe.msgprint(_("Number of backups must be greater than zero."), alert=True)
 			self.backup_limit = 1
+
+	def validate_file_extensions(self):
+		if not self.allowed_file_extensions:
+			return
+
+		self.allowed_file_extensions = "\n".join(
+			ext.strip().upper() for ext in self.allowed_file_extensions.strip().splitlines()
+		)
 
 	def on_update(self):
 		self.set_defaults()
