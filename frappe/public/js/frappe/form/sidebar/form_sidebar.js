@@ -5,7 +5,7 @@ import "./review";
 import "./document_follow";
 import "./user_image";
 import "./form_sidebar_users";
-import './form_document_template';
+import "./document_template";
 import { get_user_link, get_user_message } from "../footer/version_timeline_content_builder";
 
 frappe.ui.form.Sidebar = class {
@@ -162,9 +162,7 @@ frappe.ui.form.Sidebar = class {
 
 	make_attachments() {
 		var me = this;
-		if (this.frm.doc.__islocal) {
-			me.sidebar.find(".form-attachments").toggle(false);
-		}
+		me.sidebar.find(".form-attachments").toggle(!this.frm.doc.__islocal);
 
 		this.frm.attachments = new frappe.ui.form.Attachments({
 			parent: me.sidebar.find(".form-attachments"),
@@ -173,9 +171,7 @@ frappe.ui.form.Sidebar = class {
 	}
 
 	make_assignments() {
-		if (this.frm.doc.__islocal) {
-			this.sidebar.find(".form-assignments").toggle(false);
-		}
+		this.sidebar.find(".form-assignments").toggle(!this.frm.doc.__islocal);
 
 		this.frm.assign_to = new frappe.ui.form.AssignTo({
 			parent: this.sidebar.find(".form-assignments"),
@@ -184,9 +180,7 @@ frappe.ui.form.Sidebar = class {
 	}
 
 	make_shared() {
-		if (this.frm.doc.__islocal) {
-			this.sidebar.find(".form-shared").toggle(false);
-		}
+		this.sidebar.find(".form-shared").toggle(!this.frm.doc.__islocal);
 
 		this.frm.shared = new frappe.ui.form.Share({
 			frm: this.frm,
@@ -218,11 +212,9 @@ frappe.ui.form.Sidebar = class {
 	make_follow() {
 		this.follow_button = this.sidebar.find(".form-sidebar-stats .form-follow");
 
-		if (this.frm.doc.__islocal) {
-			this.follow_button.toggle(false);
-		}
+		this.follow_button.toggle(!this.frm.doc.__islocal);
 
-		this.follow_button.on('click', () => {
+		this.follow_button.on("click", () => {
 			let is_followed = this.frm.get_docinfo().is_document_followed;
 			frappe
 				.call("frappe.desk.form.document_follow.update_follow", {
@@ -273,24 +265,21 @@ frappe.ui.form.Sidebar = class {
 	refresh_image() {}
 
 	make_document_template() {
-		const document_template_wrapper = this.sidebar.find('.document-template-section');
-
-		var me = this;
+		let me = this;
 		if (this.frm.meta.hide_toolbar) return;
 
-		// document_template_wrapper.toggle(this.frm.doc.__islocal ? true : false);
+		let document_template_wrapper = this.sidebar.find(".document-template-section");
+
 		this.form_template = new frappe.ui.form.DocumentTemplate({
-			parent: document_template_wrapper,
-			frm: me.frm
+			wrapper: document_template_wrapper,
+			frm: me.frm,
 		});
 	}
 
 	make_review() {
 		const review_wrapper = this.sidebar.find(".form-reviews");
 
-		if (this.frm.doc.__islocal) {
-			review_wrapper.toggle(false);
-		}
+		review_wrapper.toggle(!this.frm.doc.__islocal);
 
 		if (frappe.boot.energy_points_enabled && !this.frm.is_new()) {
 			this.frm.reviews = new frappe.ui.form.Review({

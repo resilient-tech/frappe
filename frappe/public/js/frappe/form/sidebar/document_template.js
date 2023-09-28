@@ -2,20 +2,12 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 	constructor(opts) {
 		$.extend(this, opts);
 		this.doctype = this.frm.doctype;
-		this.template_wrapper = this.parent.find(".document-template");
-
+		this.template_wrapper = this.wrapper.find(".document-template");
 		this.templates = [];
 
-		// ToDo: Handle templating for DocType
-		if (this.doctype === "DocType") return;
-
-		if (
-			!this.frm.has_perm("write") ||
-			!this.frm.has_perm("create") ||
-			frappe.session.user === "Guest" ||
-			(!this.frm.is_new() && this.frm.doc.docstatus != 0)
-		) {
-			return this.parent.toggle(false);
+		if (this.doctype == "DocType" || (!this.frm.is_new() && this.frm.doc.docstatus != 0)) {
+			this.wrapper.toggle(false);
+			return;
 		}
 
 		this.make();
@@ -34,7 +26,6 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 		`);
 
 		this.$input_area = this.template_wrapper.find(".input-area");
-		this.$form_templates = this.template_wrapper.find(".document-template");
 		this.$saved_templates = this.template_wrapper.find(".saved-templates").hide();
 		this.$saved_templates_preview = this.template_wrapper.find(".saved-templates-preview");
 		this.saved_templates_hidden = true;
@@ -42,7 +33,6 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 		this.template_input = frappe.ui.form.make_control({
 			df: {
 				fieldtype: "Data",
-				fieldname: "template_name",
 				placeholder: __("Template Name"),
 				input_class: "input-xs",
 			},
@@ -55,6 +45,7 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 		this.bind_save_template();
 		this.bind_toggle_saved_templates();
 		this.bind_click_template();
+		this.bind_sync_templates();
 		this.bind_remove_template();
 	}
 
@@ -72,12 +63,20 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 	}
 
 	filter_template(template) {
-		return `<button class="list-link filter-pill list-sidebar-button data-pill btn" data-name="${
-			template.name
-		}">
-		<a class="ellipsis template-name">${template.template_name}</a>
-			<a class="remove">${frappe.utils.icon("close")}</a>
-		</button>`;
+		const template_name =
+			template.template_name.length > 15
+				? template.template_name.slice(0, 15) + "..."
+				: template.template_name;
+
+		return `
+			<button class="list-link filter-pill list-sidebar-button data-pill btn" data-name="${
+				template.name
+			}">
+				<a class="ellipsis template-name">${template_name}</a>
+				<a class="mr-4 sync close">${frappe.utils.icon("es-line-reload")}</a>
+				<a class="remove close">${frappe.utils.icon("close")}</a>
+			</button>
+		`;
 	}
 
 	bind_save_template() {
@@ -106,10 +105,12 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 	}
 
 	bind_click_template() {
-		this.template_wrapper.on("click", ".filter-pill", (e) => {
-			let $template = $(e.currentTarget);
+		this.template_wrapper.on("click", ".filter-pill .template-name", (e) => {
+			debugger;
+			let $template = $(e.currentTarget).parent(".filter-pill");
 			this.set_applied_template($template);
 			const name = $template.attr("data-name");
+			console.log(name);
 			try {
 				this.get_template_data(name);
 				let doc = JSON.parse(this.template_data);
@@ -142,14 +143,35 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 		});
 	}
 
+	bind_sync_templates() {
+		this.template_wrapper.on("click", ".filter-pill .sync", (e) => {
+			let $template = $(e.currentTarget).closest(".filter-pill");
+			const filter_label = $template.text().trim();
+
+			frappe.confirm(
+				__("Are you sure you want to Update the {0} template?", [filter_label.bold()]),
+				() => {
+					const name = $template.attr("data-name");
+					this.update_template(name).then(() => this.refresh());
+				}
+			);
+		});
+	}
+
 	bind_remove_template() {
 		this.template_wrapper.on("click", ".filter-pill .remove", (e) => {
 			let $template = $(e.currentTarget).closest(".filter-pill");
-			const name = $template.attr("data-name");
-			const applied_templates = this.get_template_values(name);
-			$template.remove();
-			this.remove_template(name).then(() => this.refresh());
-			this.$input_area.remove_filters(applied_templates);
+			const filter_label = $template.text().trim();
+
+			frappe.confirm(
+				__("Are you sure you want to remove the {0} template?", [filter_label.bold()]),
+				() => {
+					const name = $template.attr("data-name");
+					const applied_templates = this.get_template_values(name);
+					$template.remove();
+					this.remove_template(name).then(() => this.refresh());
+				}
+			);
 		});
 	}
 
@@ -162,7 +184,7 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 	toggle_saved_templates(show) {
 		this.$saved_templates.toggle(show);
 		const label = show ? __("Hide Saved") : __("Show Saved Templates");
-		this.template_wrapper.find(".saved-templates-preview").text(label);
+		this.$saved_templates_preview.text(label);
 		this.saved_templates_hidden = !this.saved_templates_hidden;
 	}
 
@@ -177,6 +199,15 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 			template_name,
 			data: JSON.stringify(this.frm.doc),
 		});
+	}
+
+	update_template(template_name) {
+		return frappe.db.set_value(
+			"Document Template",
+			template_name,
+			"data",
+			JSON.stringify(this.frm.doc)
+		);
 	}
 
 	get_template_values(template_name) {
