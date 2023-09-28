@@ -106,11 +106,10 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 
 	bind_click_template() {
 		this.template_wrapper.on("click", ".filter-pill .template-name", (e) => {
-			debugger;
 			let $template = $(e.currentTarget).parent(".filter-pill");
 			this.set_applied_template($template);
 			const name = $template.attr("data-name");
-			console.log(name);
+
 			try {
 				this.get_template_data(name);
 				let doc = JSON.parse(this.template_data);

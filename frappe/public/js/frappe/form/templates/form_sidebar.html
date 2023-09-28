@@ -18,10 +18,12 @@
 </ul>
 {% if frm.meta.beta %}
 <div class="sidebar-menu">
-	<p><label class="indicator-pill yellow" title="{{ __("This feature is brand new and still experimental") }}">{{ __("Experimental") }}</label></p>
-	<p><a class="small text-muted" href="https://github.com/frappe/{{ frappe.boot.module_app[frappe.scrub(frm.meta.module)] }}/issues/new"
+	<p><label class="indicator-pill yellow" title="{{ __(" This feature is brand new and still experimental") }}">{{
+			__("Experimental") }}</label></p>
+	<p><a class="small text-muted"
+			href="https://github.com/frappe/{{ frappe.boot.module_app[frappe.scrub(frm.meta.module)] }}/issues/new"
 			target="_blank">
-		{{ __("Click here to post bugs and suggestions") }}</a></p>
+			{{ __("Click here to post bugs and suggestions") }}</a></p>
 
 </div>
 {% endif %}
@@ -45,32 +47,34 @@
 	<li class="flex flex-wrap">
 		<span class="assignments"></span>
 		<button class="add-assignment-btn data-pill btn">
-			<svg class="es-icon mr-2 icon-sm"><use href="#es-line-customer"></use></svg>
+			<svg class="es-icon mr-2 icon-sm">
+				<use href="#es-line-customer"></use>
+			</svg>
 			<span class="ellipsis">{%= __("Add Assignee") %}</span>
 		</button>
 	</li>
 </ul>
 <ul class="list-unstyled sidebar-menu form-attachments">
 	<li class="sidebar-label attachments-label">
-	<span class="ellipsis">{%= __("Attachments") %}</span>
+		<span class="ellipsis">{%= __("Attachments") %}</span>
 
-		<li class="explore-full-btn hidden">
-			<button class="data-pill btn">
-				<span class="pill-label ellipsis">
-					{%= __("Explore Files") %}
-				</span>
-				<svg class="es-icon icon-sm">
-					<use href="#es-line-folder-alt"></use>
-				</svg>
-			</button>
-		</li>
+	<li class="explore-full-btn hidden">
+		<button class="data-pill btn">
+			<span class="pill-label ellipsis">
+				{%= __("Explore Files") %}
+			</span>
+			<svg class="es-icon icon-sm">
+				<use href="#es-line-folder-alt"></use>
+			</svg>
+		</button>
+	</li>
 
 
-		<li class="show-all-btn hidden">
-			<a href="" class="pill-label ellipsis">
-				{%= __("Show All") %}
-			</a>
-		</li>
+	<li class="show-all-btn hidden">
+		<a href="" class="pill-label ellipsis">
+			{%= __("Show All") %}
+		</a>
+	</li>
 	</li>
 	<li class="attachments-actions">
 		<button class="data-pill btn add-attachment-btn">
@@ -90,12 +94,16 @@
 </ul>
 <ul class="list-unstyled sidebar-menu form-reviews">
 	<li class="sidebar-label reviews-label">
-		<svg class="icon icon-sm"><use href="#icon-review"></use></svg>
+		<svg class="icon icon-sm">
+			<use href="#icon-review"></use>
+		</svg>
 		{%= __("Reviews") %}
 	</li>
 	<li class="reviews">
 		<button class="add-review-btn text-muted btn btn-default icon-btn">
-			<svg class="icon icon-sm"><use href="#icon-add"></use></svg>
+			<svg class="icon icon-sm">
+				<use href="#icon-add"></use>
+			</svg>
 		</button>
 	</li>
 </ul>
@@ -111,7 +119,9 @@
 	<li class="flex flex-wrap">
 		<span class="shares"></span>
 		<button class="share-doc-btn text-muted data-pill btn">
-			<svg class="es-icon mr-2 icon-sm"><use href="#es-line-share"></use></svg>
+			<svg class="es-icon mr-2 icon-sm">
+				<use href="#es-line-share"></use>
+			</svg>
 			{%= __("Invite") %}
 		</button>
 	</li>
@@ -135,14 +145,16 @@
 </ul>
 <ul class="list-unstyled sidebar-menu document-template-section">
 	<li class="sidebar-label">
-		<svg class="icon icon-sm"><use href="#icon-link-url"></use></svg>
 		{%= __("Save Template") %}
 	</li>
 	<li class="document-template list-link">
 	</li>
 </ul>
 <ul class="list-unstyled sidebar-menu">
-	<a><li class="auto-repeat-status"><li></a>
+	<a>
+		<li class="auto-repeat-status">
+		<li>
+	</a>
 </ul>
 <ul class="list-unstyled sidebar-menu form-sidebar-stats">
 	<li class="flex">
@@ -185,5 +197,5 @@
 	<li class="created-by"></li>
 </ul>
 {% if(frappe.get_form_sidebar_extension) { %}
-	{{ frappe.get_form_sidebar_extension() }}
+{{ frappe.get_form_sidebar_extension() }}
 {% } %}
