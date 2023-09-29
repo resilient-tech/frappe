@@ -73,8 +73,8 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 				template.name
 			}">
 				<a class="ellipsis template-name">${template_name}</a>
-				<a class="mr-4 sync close">${frappe.utils.icon("es-line-reload")}</a>
-				<a class="remove close">${frappe.utils.icon("close")}</a>
+				<a class="mr-4 sync close">${frappe.utils.icon("es-line-notes")}</a>
+				<a class="remove close">${frappe.utils.icon("close-alt")}</a>
 			</button>
 		`;
 	}
