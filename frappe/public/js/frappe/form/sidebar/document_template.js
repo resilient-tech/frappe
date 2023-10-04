@@ -119,7 +119,7 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 
 					frappe.dom.freeze(__("Copying {0}", [doc.doctype]) + "...");
 					sleep(300).then(() => {
-						if (!this.frm.doc.__islocal) {
+						if (this.frm.doc.__islocal) {
 							let res = frappe.model.with_doctype(doc.doctype, () => {
 								let newdoc = frappe.model.copy_doc(doc);
 								newdoc.idx = null;
