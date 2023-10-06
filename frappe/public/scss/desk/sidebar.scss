@@ -533,3 +533,12 @@ body[data-route^="Module"] .main-menu {
 .shared-user {
 	margin-bottom: 10px;
 }
+
+@media(max-width: 1440px) {
+
+	body[data-route^="Form"]{
+		.template-name {
+			max-width: 60%
+		}
+	}
+}
