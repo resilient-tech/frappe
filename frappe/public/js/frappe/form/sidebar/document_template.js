@@ -63,16 +63,15 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 	}
 
 	filter_template(template) {
-		const template_name =
-			template.template_name.length > 15
-				? template.template_name.slice(0, 15) + "..."
-				: template.template_name;
+		const template_name = template.name.length > 15
+				? template.name.slice(0, 15) + "..."
+				: template.name;
 
 		return `
 			<button class="list-link filter-pill list-sidebar-button data-pill btn" data-name="${
 				template.name
 			}">
-				<a class="ellipsis template-name">${template_name}</a>
+				<a class="ellipsis template-name" title="${template.name}">${template_name}</a>
 				<a class="mr-4 sync close">${frappe.utils.icon("es-line-notes")}</a>
 				<a class="remove close">${frappe.utils.icon("close-alt")}</a>
 			</button>
@@ -145,7 +144,7 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 	bind_sync_templates() {
 		this.template_wrapper.on("click", ".filter-pill .sync", (e) => {
 			let $template = $(e.currentTarget).closest(".filter-pill");
-			const filter_label = $template.text().trim();
+			const filter_label = $template.attr('data-name').trim();
 
 			frappe.confirm(
 				__("Are you sure you want to Update the {0} template?", [filter_label.bold()]),
@@ -160,7 +159,7 @@ frappe.ui.form.DocumentTemplate = class DocumentTemplate {
 	bind_remove_template() {
 		this.template_wrapper.on("click", ".filter-pill .remove", (e) => {
 			let $template = $(e.currentTarget).closest(".filter-pill");
-			const filter_label = $template.text().trim();
+			const filter_label = $template.attr('data-name').trim();
 
 			frappe.confirm(
 				__("Are you sure you want to remove the {0} template?", [filter_label.bold()]),
