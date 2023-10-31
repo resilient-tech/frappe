@@ -93,6 +93,49 @@ def get_print_format_doc(print_format_name, meta):
 			return None
 
 
+def add_column(column, formatted_data):
+    if column["fields"]:
+        column_break = {
+            "fieldtype": "Column Break"
+        }
+        formatted_data.append(column_break)
+        
+        for field in column["fields"]:
+            del field["fieldtype"]
+            formatted_data.append(field)
+            
+    return formatted_data
+
+def add_section(section, formatted_data):
+    if section["has_fields"]:
+        section_break = {
+            "fieldtype": "Section Break",
+            "label": section["label"]
+        }
+        formatted_data.append(section_break)
+        
+        for column in section["columns"]:
+            formatted_data = add_column(column, formatted_data)
+            
+    return formatted_data
+            
+
+def get_print_format_builder(format_data):
+    formatted_data = []
+    header = {
+        "fieldname": "print_heading_template",
+        "fieldtype": "Custom HTML",
+        "options": format_data["header"]
+    }
+    formatted_data.append(header)
+    
+
+    for section in format_data["sections"]:
+        formatted_data = add_section(section, formatted_data)
+        
+    return formatted_data
+
+
 def get_rendered_template(
 	doc: "Document",
 	print_format: str | None = None,
@@ -154,6 +197,10 @@ def get_rendered_template(
 		elif print_format.format_data:
 			# set format data
 			format_data = json.loads(print_format.format_data)
+
+			if print_format.print_format_builder_beta:
+				format_data = get_print_format_builder(format_data)
+				
 			for df in format_data:
 				format_data_map[df.get("fieldname")] = df
 				if "visible_columns" in df:
