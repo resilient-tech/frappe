@@ -8,7 +8,6 @@ import re
 import redis
 
 import frappe
-# NOTE  import for get_controller from Document
 from frappe.model.base_document import get_controller
 from frappe.utils import cint, strip_html_tags
 from frappe.utils.data import cstr

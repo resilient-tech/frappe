@@ -30,16 +30,12 @@ from frappe.model import (
 	optional_fields,
 	table_fields,
 )
-from frappe.model.base_document import (
+from frappe.model.base_document import (  # BaseDocument,
 	DOCTYPE_TABLE_FIELDS,
 	TABLE_DOCTYPES_FOR_DOCTYPE,
-	# BaseDocument,
 )
-
-# NOTE alias import for BaseDocument
-from frappe.model.document import Document as BaseDocument
-
 from frappe.model.document import Document
+from frappe.model.document import Document as BaseDocument
 from frappe.model.workflow import get_workflow_name
 from frappe.modules import load_doctype_module
 from frappe.utils import cast, cint, cstr

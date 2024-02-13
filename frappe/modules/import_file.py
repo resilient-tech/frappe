@@ -5,7 +5,6 @@ import json
 import os
 
 import frappe
-# NOTE  import for get_controller from Document
 from frappe.model.base_document import get_controller
 from frappe.modules import get_module_path, scrub_dt_dn
 from frappe.query_builder import DocType

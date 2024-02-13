@@ -10,7 +10,6 @@ from unittest.mock import patch
 import frappe
 from frappe.core.doctype.doctype.test_doctype import new_doctype
 from frappe.exceptions import DoesNotExistError
-# NOTE  import for get_controller from Document
 from frappe.model.base_document import get_controller
 from frappe.model.rename_doc import bulk_rename, update_document_title
 from frappe.modules.utils import get_doc_path
