@@ -51,7 +51,8 @@ non_nullable_types = {
 
 class TypeExporter:
 	def __init__(self, doc):
-		from frappe.model.base_document import get_controller
+		# NOTE  import for get_controller from Document
+from frappe.model.base_document import get_controller
 
 		self.doc = doc
 		self.doctype = doc.name
@@ -128,7 +129,8 @@ class TypeExporter:
 		return "\n".join(sorted(self.imports))
 
 	def _get_doctype_imports(self, doctype):
-		from frappe.model.base_document import get_controller
+		# NOTE  import for get_controller from Document
+from frappe.model.base_document import get_controller
 
 		doctype_module = get_controller(doctype)
 

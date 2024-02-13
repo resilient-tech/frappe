@@ -10,7 +10,12 @@ from unittest.mock import patch
 import pytz
 
 import frappe
-from frappe.model.base_document import BaseDocument, get_controller
+# NOTE  import for get_controller from Document
+from frappe.model.base_document import get_controller
+# from frappe.model.base_document import BaseDocument, get_controller
+# NOTE alias import for BaseDocument
+from frappe.model.document import Document as BaseDocument
+
 from frappe.utils import cint
 from frappe.utils.data import convert_utc_to_timezone, get_datetime, get_system_timezone
 

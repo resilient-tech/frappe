@@ -1,5 +1,5 @@
 import frappe
-from frappe.model.document import get_controller
+from frappe.model.base_document import get_controller
 from frappe.utils.caching import redis_cache
 from frappe.website.page_renderers.base_template_page import BaseTemplatePage
 from frappe.website.router import (

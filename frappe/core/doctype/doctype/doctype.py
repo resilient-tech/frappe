@@ -24,6 +24,7 @@ from frappe.model import (
 	no_value_fields,
 	table_fields,
 )
+# NOTE  import for get_controller from Document
 from frappe.model.base_document import get_controller
 from frappe.model.docfield import supports_translation
 from frappe.model.document import Document

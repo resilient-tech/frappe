@@ -4,7 +4,7 @@
 from urllib.parse import quote
 
 import frappe
-from frappe.model.document import get_controller
+from frappe.model.base_document import get_controller
 from frappe.utils import get_url, nowdate
 from frappe.website.router import get_pages
 

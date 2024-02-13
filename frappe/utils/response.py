@@ -216,8 +216,11 @@ def json_handler(obj):
 
 	elif isinstance(obj, LocalProxy):
 		return str(obj)
+	
+	# NOTE import of document
+	# elif isinstance(obj, frappe.model.document.BaseDocument):
 
-	elif isinstance(obj, frappe.model.document.BaseDocument):
+	elif isinstance(obj, frappe.model.document.Document):
 		return obj.as_dict(no_nulls=True)
 	elif isinstance(obj, Iterable):
 		return list(obj)

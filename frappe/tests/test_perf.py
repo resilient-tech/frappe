@@ -25,6 +25,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fi
 
 import frappe
 from frappe.frappeclient import FrappeClient
+# NOTE  import for get_controller from Document
 from frappe.model.base_document import get_controller
 from frappe.query_builder.utils import db_type_is
 from frappe.tests.test_query_builder import run_only_if

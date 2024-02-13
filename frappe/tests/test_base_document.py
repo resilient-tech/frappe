@@ -1,4 +1,7 @@
-from frappe.model.base_document import BaseDocument
+# from frappe.model.base_document import BaseDocument
+# NOTE alias import for BaseDocument
+from frappe.model.document import Document as BaseDocument
+
 from frappe.tests.utils import FrappeTestCase
 
 
