@@ -31,7 +31,6 @@ from frappe.model.base_document import (
 	DOCTYPE_TABLE_FIELDS,
 	DOCTYPES_FOR_DOCTYPE,
 	TABLE_DOCTYPES_FOR_DOCTYPE,
-	BaseDocument,
 	get_controller,
 )
 from frappe.model.docstatus import DocStatus
@@ -99,7 +98,7 @@ def get_doc(*args, **kwargs):
 	        user = get_doc("User", "test@example.com", for_update=True)
 	"""
 	if args:
-		if isinstance(args[0], BaseDocument):
+		if isinstance(args[0], Document):
 			# already a document
 			return args[0]
 		elif isinstance(args[0], str):
@@ -125,7 +124,7 @@ def get_doc(*args, **kwargs):
 	raise ImportError(doctype)
 
 
-class Document(BaseDocument):
+class Document():
 	"""All controllers inherit from `Document`."""
 
 	doctype: DF.Data
@@ -1744,7 +1743,7 @@ class Document(BaseDocument):
 
 	def update_if_missing(self, d):
 		"""Set default values for fields without existing values"""
-		if isinstance(d, BaseDocument):
+		if isinstance(d, Document):
 			d = d.get_valid_dict()
 
 		for key, value in d.items():
@@ -1828,7 +1827,7 @@ class Document(BaseDocument):
 	def parent_doc(self):
 		parent_doc_ref = getattr(self, "_parent_doc", None)
 
-		if isinstance(parent_doc_ref, BaseDocument):
+		if isinstance(parent_doc_ref, Document):
 			return parent_doc_ref
 		elif isinstance(parent_doc_ref, weakref.ReferenceType):
 			return parent_doc_ref()
@@ -1857,7 +1856,7 @@ class Document(BaseDocument):
 			self.get(doc.parentfield).remove(doc)
 
 	def _init_child(self, value, key):
-		if not isinstance(value, BaseDocument):
+		if not isinstance(value, Document):
 			if not (doctype := self.get_table_field_doctype(key)):
 				raise AttributeError(key)
 
