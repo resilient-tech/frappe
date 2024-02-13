@@ -64,7 +64,7 @@ from frappe.utils.html_utils import unescape_html
 if TYPE_CHECKING:
 	from frappe.core.doctype.docfield.docfield import DocField
 
-# derived from `base_document.py` 
+# derived from `base_document.py`
 D = TypeVar("D", bound="Document")
 
 
@@ -136,6 +136,22 @@ class Document(BaseDocument):
 	modified: DF.Datetime
 	modified_by: DF.Link
 	idx: DF.Int
+
+	_reserved_keywords = frozenset(
+		(
+			"doctype",
+			"meta",
+			"flags",
+			"parent_doc",
+			"_table_fields",
+			"_valid_columns",
+			"_doc_before_save",
+			"_table_fieldnames",
+			"_reserved_keywords",
+			"permitted_fieldnames",
+			"dont_update_if_missing",
+		)
+	)
 
 	def __init__(self, *args, **kwargs):
 		"""Constructor.
