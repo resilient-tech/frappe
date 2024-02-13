@@ -170,7 +170,7 @@ class Document(BaseDocument):
 
 		if kwargs:
 			# init base document
-			super().__init__(kwargs)
+			self.base_initialization(kwargs)
 			self.init_child_tables()
 			self.init_valid_columns()
 
@@ -193,7 +193,7 @@ class Document(BaseDocument):
 				single_doc["name"] = self.doctype
 				del single_doc["__islocal"]
 
-			super().__init__(single_doc)
+			self.base_initialization(single_doc)
 			self.init_valid_columns()
 			self._fix_numeric_types()
 
@@ -212,7 +212,7 @@ class Document(BaseDocument):
 					frappe.DoesNotExistError,
 				)
 
-			super().__init__(d)
+			self.base_initialization(d)
 		self.flags.pop("ignore_children", None)
 
 		for df in self._get_table_fields():
@@ -1667,7 +1667,7 @@ class Document(BaseDocument):
 
 		# NOTE: Methods of the BaseDocument classe
 
-	def __init__(self, d):
+	def base_initialization(self, d):
 		if d.get("doctype"):
 			self.doctype = d["doctype"]
 
