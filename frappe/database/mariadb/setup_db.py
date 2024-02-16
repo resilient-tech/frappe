@@ -113,10 +113,7 @@ def check_database_settings():
 	result = True
 	for key, expected_value in REQUIRED_MARIADB_CONFIG.items():
 		if mariadb_variables.get(key) != expected_value:
-			print(
-				"For key %s. Expected value %s, found value %s"
-				% (key, expected_value, mariadb_variables.get(key))
-			)
+			print(f"For key {key}. Expected value {expected_value}, found value {mariadb_variables.get(key)}")
 			result = False
 
 	if not result:
@@ -164,9 +161,7 @@ def get_root_connection():
 			)
 
 		if not frappe.flags.root_password:
-			frappe.flags.root_password = frappe.conf.get("root_password") or getpass(
-				"MySQL root password: "
-			)
+			frappe.flags.root_password = frappe.conf.get("root_password") or getpass("MySQL root password: ")
 
 		frappe.local.flags.root_connection = frappe.database.get_db(
 			host=frappe.conf.db_host,
